@@ -3,6 +3,7 @@
 ## 진행 기록
 - ▶ 1단계 (병렬) T1, T2 시작 — 형식 타입·템플릿 모델, ErrorEnum·검증 에러 매핑(이후 작업의 기반)
 - ✔ T1 완료 — `src/models/k8s_names.py` 추가, `src/models/user_job.py`에 `JobSize`·`WebTemplate`·`JobTemplate`·`MAX_JOBS_PER_USER` 추가, `tests/test_user_job_model.py`. pytest 146 passed (#8)
+- ✔ T2 완료 — `ErrorEnum` 9개 추가·`INVALID_PARAMETER` 메시지 변경, `src/core/exception/validation_error.py`(`to_error_enum`), `tests/test_validation_error.py`. pytest 174 passed (#9)
 
 ## spec과 달라진 점
 - 없음
