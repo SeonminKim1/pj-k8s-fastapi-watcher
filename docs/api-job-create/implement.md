@@ -11,6 +11,9 @@
 - ■ 2단계 완료 — 다음: 3단계 T5
 - ▶ 3단계 (순차) T5 시작 — UserJob·create_job을 템플릿 입력·개수 한도로 변경
 - ✔ T5 완료 — `src/models/user_job.py`(`template`·`quota_slot`), `src/services/user_job_service.py`(`create_job(owner_id, name, template)`, `INVALID_USER_ID`·`INVALID_JOB_NAME`·`JOB_QUOTA_EXCEEDED`), `tests/test_user_job_service.py`(가짜 repository 슬롯 규칙, 매니페스트 검증 테스트 제거, 한도 테스트 추가). pytest 175 passed (#12)
+- ■ 3단계 완료 — 다음: 4단계 T6
+- ▶ 4단계 (순차) T6 시작 — 쓰지 않게 된 옛 매니페스트 검증 코드 제거
+- ✔ T6 완료 — service 정규식·이름 검사 함수·`_build_resources`, repository `insert`, `ALLOWED_RESOURCE_KINDS`, `INVALID_JOB_RESOURCE` 제거(116줄 삭제). 동작 변화 없음, pytest 175 passed (#13)
 
 ## spec과 달라진 점
 - 없음

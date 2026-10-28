@@ -68,19 +68,6 @@ class UserJobRepository:
             name="owner_created_at",
         )
 
-    # 새 job 문서를 저장한다. 이름이 겹치면 DuplicateJobNameError.
-    async def insert(self, job_doc: dict[str, Any]) -> UserJob:
-        doc = dict(job_doc)
-        try:
-            result = await self.collection.insert_one(doc)
-        except DuplicateKeyError as e:
-            # 이름 인덱스 위반만 이름 중복으로 바꾼다. 다른 유니크 위반은 그대로 올려 500(db_error)으로 처리된다.
-            if (e.details or {}).get("keyPattern") == _OWNER_NAME_KEY:
-                raise DuplicateJobNameError from e
-            raise
-        doc["_id"] = result.inserted_id
-        return _to_model(doc)
-
     # 삭제되지 않은 job이 차지한 슬롯 번호들.
     async def _used_slots(self, owner_id: str) -> set[int]:
         cursor = self.collection.find(

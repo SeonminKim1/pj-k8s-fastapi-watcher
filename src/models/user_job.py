@@ -18,16 +18,6 @@ class JobStatus(StrEnum):
     FAILED = "failed"
 
 
-# job을 구성할 수 있는 (apiVersion, kind). Secret은 매니페스트가 평문으로 저장되므로 제외한다.
-ALLOWED_RESOURCE_KINDS: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("apps/v1", "Deployment"),
-        ("v1", "Service"),
-        ("v1", "ConfigMap"),
-        ("batch/v1", "Job"),
-    }
-)
-
 # 이전 상태 → 갈 수 있는 다음 상태. pending으로 돌아가는 전이는 없다.
 ALLOWED_STATUS_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     JobStatus.PENDING: frozenset({JobStatus.RUNNING, JobStatus.FAILED}),
@@ -78,7 +68,9 @@ class JobResource(BaseModel):
     """job을 구성하는 리소스 하나. api_version·kind·name은 manifest에서 꺼낸 조회용 값이다."""
 
     api_version: str = Field(description="매니페스트의 apiVersion. 예: apps/v1")
-    kind: str = Field(description="매니페스트의 kind. ALLOWED_RESOURCE_KINDS 중 하나")
+    kind: str = Field(
+        description="매니페스트의 kind. 템플릿 타입별 목록(services/job_templates.py의 KINDS_BY_TYPE) 중 하나"
+    )
     name: str = Field(description="매니페스트의 metadata.name. web 템플릿은 job 이름")
     manifest: dict[str, Any] = Field(
         description="operator가 server-side apply할 매니페스트. 템플릿으로 서버가 생성한다"

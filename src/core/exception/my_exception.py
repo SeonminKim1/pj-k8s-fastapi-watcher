@@ -42,11 +42,6 @@ class ErrorEnum(Enum):
         400,
         "job은 유저당 10개까지 만들 수 있습니다.",
     )
-    INVALID_JOB_RESOURCE = (
-        "invalid_job_resource",
-        400,
-        "job 리소스 매니페스트가 유효하지 않습니다.",
-    )
     JOB_NAME_DUPLICATED = (
         "job_name_duplicated",
         400,
