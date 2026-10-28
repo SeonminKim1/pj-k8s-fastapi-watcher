@@ -20,6 +20,8 @@ _DNS_LABEL_RE = re.compile(r"^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$")
 _DNS_SUBDOMAIN_RE = re.compile(
     r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
 )
+# DNS-1035 label: Service 이름 (영문 소문자로 시작, 1~63자, 점 불가). 클러스터 DNS 이름으로 쓰인다.
+_DNS_1035_LABEL_RE = re.compile(r"^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$")
 
 # 동시 갱신으로 조건부 갱신이 어긋났을 때 다시 읽어 판단하는 최대 횟수
 _STATUS_UPDATE_RETRIES = 3
@@ -39,6 +41,17 @@ def _is_dns_subdomain(value: Any) -> bool:
         and len(value) <= 253
         and bool(_DNS_SUBDOMAIN_RE.fullmatch(value))
     )
+
+
+def _is_dns_1035_label(value: Any) -> bool:
+    return isinstance(value, str) and bool(_DNS_1035_LABEL_RE.fullmatch(value))
+
+
+# kind별 리소스 이름 규칙. Service는 DNS-1035 label, 나머지는 DNS-1123 subdomain.
+def _is_valid_resource_name(kind: str, name: Any) -> bool:
+    if kind == "Service":
+        return _is_dns_1035_label(name)
+    return _is_dns_subdomain(name)
 
 
 # 매니페스트 목록을 검증해 JobResource로 바꾼다. namespace는 job 네임스페이스로 채운다.
@@ -61,9 +74,10 @@ def _build_resources(
         # 문자열인지 먼저 본다. dict 같은 값은 해시가 안 돼 set 조회에서 TypeError(500)가 난다.
         if not isinstance(api_version, str) or not isinstance(kind, str):
             raise MyApiError(ErrorEnum.INVALID_JOB_RESOURCE)
-        if (api_version, kind) not in ALLOWED_RESOURCE_KINDS or not _is_dns_subdomain(
-            name
-        ):
+        if (
+            api_version,
+            kind,
+        ) not in ALLOWED_RESOURCE_KINDS or not _is_valid_resource_name(kind, name):
             raise MyApiError(ErrorEnum.INVALID_JOB_RESOURCE)
         if metadata.get("namespace") not in (None, namespace):
             raise MyApiError(ErrorEnum.INVALID_JOB_RESOURCE)

@@ -38,8 +38,13 @@
 - 기본 DB `k8s_client`에 다른 컬렉션(`deploy_jobs`, `deploy_query_logs`)이 이미 있다. 이름은 겹치지 않지만 다른 프로젝트 데이터라면 `MONGO_DB_NAME`을 분리한다.
 - `gh issue close`가 `Could not close the issue` 오류를 내면서도 실제로는 닫히는 경우가 있었다(#4, #5). Project의 Status를 Done으로 바꾸면 이슈를 닫는 기본 워크플로와 겹친 것으로 추정한다(원인은 확인하지 않음).
 - 다음 기능: `api-job-*`(job 생성·조회·삭제 API, 클러스터 네임스페이스 생성 정책 포함), `component-job-operator`(K8sService 메서드, reconcile, resync).
+- **다음 schema 작업 때 할 일**(2026-10-28 결정): 형식 검증(`_is_user_id`, `_is_dns_label`, `_is_dns_subdomain`, `_is_dns_1035_label`)의 정규식을 공용 `Annotated` 타입(예: `src/models/k8s_names.py`)으로 분리해 schema·model·service가 함께 쓴다. FastAPI 기본 422를 400 `invalid_parameter`로 바꾸는 `RequestValidationError` 핸들러를 추가한다. 도메인 규칙(허용 목록, kind별 이름, 네임스페이스, 중복)은 service에 남기고, service의 형식 검사를 뺄지는 그 기능의 PLAN에서 정한다.
 
 ## 변경: 2026-10-28 모델 필드 설명 추가
 - `src/models/user_job.py`의 `JobResource`·`UserJob` 모든 필드에 `Field(description=...)` 추가(SPEC 모델 표 기준). 동작 변화 없음(필수/기본값 그대로).
 - `docs/fastapi-sdd-template.md` Python 규칙에 "models/·schemas/ 필드는 `Field(description=...)`" 추가.
 - 확인: ruff, pytest 통과. `UserJob.model_json_schema()`에 설명 포함 확인.
+
+## 변경: 2026-10-28 Service 이름 규칙(DNS-1035) 적용, 에러 규칙 500 명시
+- Service 이름이 DNS-1123 subdomain으로만 검사돼 `1web`, `web.v1` 같은 이름이 저장 단계를 통과하고 operator apply에서야 실패하던 문제를 고쳤다. `_is_valid_resource_name(kind, name)`으로 kind별 규칙을 적용(Service는 DNS-1035 label). spec.md·모델 설명 갱신, 테스트 4개 추가.
+- 사용자가 PRD의 에러 규칙을 400/404/500으로 수정함 → `CLAUDE.md` "에러 상태 코드"와 spec.md를 맞춤(비즈니스 에러는 400·404, 500은 전역 핸들러만).

@@ -164,6 +164,26 @@ async def test_create_job_invalid_resource(
     assert_error(e, ErrorEnum.INVALID_JOB_RESOURCE)
 
 
+# Service 이름은 DNS-1035 label: 숫자로 시작·점 포함·64자 이상은 거부
+@pytest.mark.parametrize("name", ["1web", "web.v1", "a" * 64])
+async def test_create_job_invalid_service_name(
+    service: UserJobService, name: str
+) -> None:
+    with pytest.raises(MyApiError) as e:
+        await service.create_job("alice", "my-app", [manifest("Service", name, "v1")])
+    assert_error(e, ErrorEnum.INVALID_JOB_RESOURCE)
+
+
+# Service가 아닌 리소스는 DNS-1123 subdomain: 숫자 시작·점 포함 허용
+async def test_create_job_subdomain_name_ok(service: UserJobService) -> None:
+    job = await service.create_job(
+        "alice",
+        "my-app",
+        [manifest(name="1web.v1"), manifest("ConfigMap", "a" * 64, "v1")],
+    )
+    assert [r.name for r in job.resources] == ["1web.v1", "a" * 64]
+
+
 # 같은 이름이라도 kind가 다르면 허용
 async def test_create_job_same_name_different_kind_ok(service: UserJobService) -> None:
     job = await service.create_job(

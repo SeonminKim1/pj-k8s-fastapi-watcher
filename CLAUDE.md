@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - HTTP API 기능은 `docs/api-*`, watch 같은 백그라운드 기능은 `docs/component-*`, API·컴포넌트 없이 도메인 모델만 정의하는 기능은 `docs/domain-*` 폴더로 문서화한다.
 - **유저 식별**: 인증은 앞단(게이트웨이)이 처리하고, 이 서비스는 요청 헤더 `X-User-Id`의 값을 유저 ID로 신뢰한다. 유저 ID는 소문자·숫자·`-`만, 영숫자로 시작·끝, 1~58자여야 한다(아니면 400).
 - **유저별 네임스페이스**: 유저의 리소스는 모두 전용 네임스페이스 `user-{유저 ID}`에 둔다. 다른 네임스페이스에는 만들지 않는다.
-- **에러 상태 코드**: 비즈니스 에러는 400(잘못된 요청·규칙 위반·중복·상태 충돌)과 404(없음·남의 리소스)로만 응답한다. 구분은 `ErrorEnum`의 `code`로 한다.
+- **에러 상태 코드**: 400(잘못된 요청·규칙 위반·중복·상태 충돌), 404(없음·남의 리소스), 500(DB 오류 등 서버 내부 오류)만 쓴다. 비즈니스 에러(`MyApiError`)는 400·404 중 하나이고 구분은 `ErrorEnum`의 `code`로 한다. 500은 전역 예외 핸들러만 응답한다.
 - **핵심 도메인 — user-job**: 유저가 만든 쿠버네티스 리소스 묶음(예: Deployment + Service)을 하나의 job으로 관리한다. job은 MongoDB에 소유자·구성 리소스(매니페스트 원본 포함)·상태를 기록한다. 상세: `docs/domain-user-job/`
 - **operator 패턴**:
   - MongoDB의 job 문서가 원하는 상태(desired), 클러스터가 실제 상태(actual)다.

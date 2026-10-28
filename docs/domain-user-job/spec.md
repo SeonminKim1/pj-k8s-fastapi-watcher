@@ -20,7 +20,7 @@
 |---|---|---|
 | `api_version` | `str` | 예: `apps/v1` |
 | `kind` | `str` | 허용 목록 중 하나 |
-| `name` | `str` | DNS-1123 subdomain(소문자·숫자·`-`·`.`, 1~253자) |
+| `name` | `str` | kind별 쿠버네티스 이름 규칙. `Service`는 DNS-1035 label(영문 소문자로 시작, 소문자·숫자·`-`, 영숫자로 끝, 1~63자), 나머지는 DNS-1123 subdomain(소문자·숫자·`-`·`.`, 1~253자) |
 | `manifest` | `dict` | operator가 server-side apply할 매니페스트 원본 |
 
 - `api_version`·`kind`·`name`은 `manifest`에서 꺼낸 값이며 조회·인덱싱용이다. 입력으로는 `manifest`만 받는다.
@@ -72,7 +72,7 @@
 - 앱 시작(lifespan) 시 `get_k8s_service()`로 클러스터 설정을 먼저 읽고(설정이 없으면 앱 시작 실패), `ensure_indexes()`를 호출하고, 종료 시 `close_client()`로 MongoDB 연결을 닫는다.
 
 ## 에러 케이스
-`CLAUDE.md`의 "에러 상태 코드" 규칙대로 400/404만 쓴다.
+`CLAUDE.md`의 "에러 상태 코드" 규칙대로 비즈니스 에러는 400/404, 서버 내부 오류는 500(전역 핸들러)이다.
 
 | 상황 | `ErrorEnum` (`code`) | 상태 코드 |
 |---|---|---|
