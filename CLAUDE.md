@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 공통 규칙: @docs/fastapi-sdd-template.md
 
 ## 프로젝트 고유 구성
-- `src/core/db/mongodb.py`: 공유 `MongoClient`(`get_client()`/`get_database()`). 환경 변수 `MONGO_URI`(기본 `mongodb://localhost:27017`), `MONGO_DB_NAME`(기본 `k8s_client`). repository에서만 사용한다.
+- `src/core/db/mongodb.py`: 공유 `AsyncMongoClient(tz_aware=True)`(`get_client()`/`get_database()`). 환경 변수 `MONGO_URI`(기본 `mongodb://localhost:27017`), `MONGO_DB_NAME`(기본 `k8s_client`). MongoDB 접근은 모두 비동기(`async def`)이며, `dependencies.py`가 repository를 만들 때만 사용한다.
+- `src/core/dependencies.py`: service·repository·`K8sService` 조립. `main.py` lifespan에서 클러스터 설정 로딩(`get_k8s_service()`)과 repository `ensure_indexes()`를 하므로, 앱을 띄우려면 클러스터 설정(in-cluster 또는 kubeconfig)과 MongoDB가 모두 필요하다(없으면 시작 실패).
 - `src/services/k8s_service.py`: `K8sService` 래퍼. 클러스터 접근은 반드시 이 클래스를 거친다. 다른 클래스는 직접 만들지 않고 생성자로 주입받는다(주입 방식은 아래 "의존성 주입").
 - `src/main.py`: `PyMongoError`는 500 `db_error`로 처리한다.
 - GitHub Project (`/feat` TASK·IMPLEMENT에서 `gh`로 이슈·상태 관리, 비어 있으면 연동 안 함)
