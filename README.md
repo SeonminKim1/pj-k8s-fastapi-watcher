@@ -21,7 +21,9 @@ uv run uvicorn src.main:app --reload
 ## API
 | Method | Path | 설명 |
 |---|---|---|
-(기능을 구현할 때마다 추가)
+| `POST` | `/jobs` | job 생성. `X-User-Id` 헤더 필수. 템플릿 입력(`web`)으로 서버가 Deployment·Service 매니페스트를 만들어 `pending`으로 저장(클러스터 반영은 operator). 유저당 10개 |
+
+- 에러 응답은 `{code, message}`이며 400·404·500만 쓴다. 요청 형식 오류는 필드별 `code`(`invalid_image`, `invalid_port` 등)로 구분한다. 상세: [docs/api-job-create/spec.md](docs/api-job-create/spec.md)
 
 ## 개발
 ```bash

@@ -20,18 +20,26 @@
 - ■ 5단계 완료 — 다음: 6단계 T8(작업 확인 중 추가)
 - ▶ 6단계 (순차) T8 시작 — `/docs`에서 실제로 쓰지 않는 422 제거(task·plan·spec에 변경 반영)
 - ✔ T8 완료 — `src/main.py`(`_openapi_without_422`), `tests/test_main.py`(`test_openapi_has_no_422`). pytest 206 passed (#16)
+- ■ 6단계 완료 — 다음: 7단계 T9
+- ▶ 7단계 (순차) T9 시작 — 문서 갱신, 실제 앱 직접 호출, 완료 체크리스트
+- ✔ T9 완료 — README API 표, `CLAUDE.md` 고유 구성, `domain-user-job` plan·task·implement 변경 섹션. 실제 앱(임시 DB)으로 정상·에러 케이스 확인(아래 메모). pytest 206 passed (#15)
+- T9 완료 체크리스트(레이어 규칙)에서 발견: 라우터가 `models/k8s_names.UserId`를 직접 import → `X-User-Id` 헤더 타입을 `src/schemas/common.py`(`UserIdHeader`)로 옮김. 동작 변화 없음, pytest 206 passed
+- ■ 7단계 완료 — 모든 작업 완료
 
 ## spec과 달라진 점
 - T7 작업 확인 중 `/docs`에 실제로 쓰지 않는 422가 표시되는 것을 발견해, spec에 "OpenAPI에는 201·400·500만 문서화"를 추가하고 T8로 구현했다. task·plan에 변경 섹션 추가, 기존 T8은 T9로 옮김.
 
 ## 완료 체크리스트
-- [ ] `uv run ruff check .` / `uv run ruff format .` 통과
-- [ ] 레이어 규칙 준수 (Router → Service → Repository, 비즈니스 에러는 `MyApiError`)
-- [ ] spec의 정상 케이스와 에러 케이스를 `/docs`에서 직접 호출해 확인
-- [ ] `uv run pytest` 통과 (비즈니스 규칙마다 service 테스트 존재)
-- [ ] README 등 관련 문서 갱신
-- [ ] task.md 체크리스트 모두 완료
+- [x] `uv run ruff check .` / `uv run ruff format .` 통과
+- [x] 레이어 규칙 준수 (Router → Service → Repository, 비즈니스 에러는 `MyApiError`. 라우터는 schema만 반환, 매니페스트 생성은 service, 슬롯 처리는 repository)
+- [x] spec의 정상 케이스와 에러 케이스를 직접 호출해 확인 — `/docs`와 같은 요청을 실제 앱에 curl로 보냄(아래 메모)
+- [x] `uv run pytest` 통과 (206 passed. service 테스트에 한도·중복·형식 규칙, router 테스트에 spec 에러 표의 모든 행)
+- [x] README 등 관련 문서 갱신 (README API 표, `CLAUDE.md` 고유 구성·요구사항, `domain-user-job` 문서)
+- [x] task.md 체크리스트 모두 완료
 
 ## 메모
 - `gh issue close`가 `Could not close the issue`를 내면서도 실제로는 닫혔다(#13). 지난 기능과 같은 현상이라 `gh issue view`로 상태만 확인했다.
 - **T4 로컬 MongoDB 확인**(9.0.2 standalone, 임시 DB `k8s_client_t4_check`, 확인 후 삭제): 인덱스 3개 생성(`uniq_owner_slot` partial `{is_deleted: false, quota_slot: {$exists: true}}`), 10개 저장 시 슬롯 0~9, 11번째 한도 초과, 한도가 찬 상태의 중복 이름은 한도 초과가 먼저, soft delete 후 비운 슬롯(3) 재사용, 빈 슬롯이 있을 때 중복 이름은 이름 중복, **동시 15개 → 정확히 10개 성공·나머지 한도 초과**, 같은 이름 동시 5개 → 1개 성공, `quota_slot` 없는 옛 문서 여러 개 저장 가능. 확인 스크립트는 저장소에 두지 않고 확인 후 scratchpad에서도 지웠다. repository를 고치면 같은 항목을 다시 확인한다.
+
+- **T9 실제 앱 확인**(uvicorn + 로컬 MongoDB 9.0.2 임시 DB `k8s_client_t9_check` + kubeconfig, 확인 후 DB 삭제·서버 종료): `/docs` 200, 정상 생성 201(응답 필드·기본값·리소스 요약), 이름 중복 `job_name_duplicated`, 헤더 없음 `invalid_user_id`, JSON 아님·정의 안 된 필드(`hostNetwork`) `invalid_parameter`, `invalid_job_name`·`invalid_job_type`·`invalid_image`(latest)·`invalid_port`·`invalid_replicas`·`invalid_env`·`invalid_size`, 10개 후 11번째 `job_quota_exceeded`, **새 유저 동시 요청 15개 → 201 10개·400 5개**. 저장 문서에 `template`(JSON)·`quota_slot`·Deployment·Service 리소스, 인덱스 4개 확인.
+- 다음 기능: `api-job-list`(cursor 페이지네이션 — `limit` 기본값·상한, cursor 인코딩, 인덱스 조정), `api-job-get`·`api-job-delete`, `component-job-operator`(네임스페이스 생성, 이름 재사용 시 `user-job-id` 라벨로 apply 미루기, probe 기반 running 판단).

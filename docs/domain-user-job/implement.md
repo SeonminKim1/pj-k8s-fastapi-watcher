@@ -55,3 +55,8 @@
 - C(리뷰 4·5·6): 상태 갱신을 "읽기 → 판단 → 조건부 갱신 × 최대 3회"에서 "허용된 이전 상태 목록으로 `$in` 조건부 갱신 1회 → 실패 시에만 읽어 이유 판단"으로 바꿨다. 재시도 상수와, 재시도 소진 시 허용된 전이를 `INVALID_STATUS_TRANSITION`으로 알리던 문제가 함께 없어졌다. repository `update_status_if` → `update_status_from(from_statuses)`. `DuplicateKeyError`는 `keyPattern`이 `uniq_owner_name` 인덱스일 때만 `DuplicateJobNameError`로 바꾸고, 그 외는 그대로 올려 500. spec.md 갱신. 로컬 MongoDB로 확인(아래).
   - 로컬 MongoDB 9.0.2 임시 DB(확인 후 삭제): `$in` 조건부 갱신 성공·빗나감(None), service 같은 상태 반환·`running→pending` 거부·`running→failed`, 이름 중복의 `keyPattern`이 `{owner_id: 1, name: 1}`, 다른 유니크 인덱스 위반은 `DuplicateKeyError` 그대로 올라옴.
 - D(리뷰 8·9·10): `test_import_does_not_load_config`가 `importlib.reload`로 함수 객체를 바꿔 다른 테스트의 `cache_clear()`가 엉뚱한 캐시를 비우던 문제 → 새 프로세스에서 설정 로딩 함수를 "호출되면 실패"로 바꾼 뒤 import하는 방식으로 변경. wiring 테스트는 `get_database`를 가짜로 바꿔 전역 MongoDB 클라이언트를 남기지 않게 함. 주석이 없던 함수 8개에 주석 추가(템플릿 규칙).
+
+## 변경: 2026-10-28 템플릿 입력·개수 한도(api-job-create)
+- 매니페스트 직접 입력을 템플릿 입력(`web`)으로 바꾸고, 유저당 job 10개 한도를 `quota_slot` 유니크 인덱스로 구현했다. spec.md는 현재 상태로 덮어썼고, 진행 기록은 `docs/api-job-create/implement.md`에 있다.
+- job 이름 규칙 DNS-1123 label → DNS-1035 label(Service 이름으로 그대로 쓰이므로).
+- 이 문서 위쪽 메모의 "다음 schema 작업 때 할 일"(공용 `Annotated` 형식 타입, 422 → 400 핸들러)을 api-job-create에서 처리했다. service의 형식 검사는 schema를 거치지 않는 호출자를 위해 남겼다.

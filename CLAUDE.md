@@ -11,7 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `src/core/db/mongodb.py`: 공유 `AsyncMongoClient(tz_aware=True)`(`get_client()`/`get_database()`). 환경 변수 `MONGO_URI`(기본 `mongodb://localhost:27017`), `MONGO_DB_NAME`(기본 `k8s_client`). MongoDB 접근은 모두 비동기(`async def`)이며, `dependencies.py`가 repository를 만들 때만 사용한다.
 - `src/core/dependencies.py`: service·repository·`K8sService` 조립. `main.py` lifespan에서 클러스터 설정 로딩(`get_k8s_service()`)과 repository `ensure_indexes()`를 하므로, 앱을 띄우려면 클러스터 설정(in-cluster 또는 kubeconfig)과 MongoDB가 모두 필요하다(없으면 시작 실패).
 - `src/services/k8s_service.py`: `K8sService` 래퍼. 클러스터 접근은 반드시 이 클래스를 거친다. 다른 클래스는 직접 만들지 않고 생성자로 주입받는다(주입 방식은 아래 "의존성 주입").
-- `src/main.py`: `PyMongoError`는 500 `db_error`로 처리한다.
+- `src/main.py`: `PyMongoError`는 500 `db_error`로 처리한다. 요청 검증 에러(FastAPI 422)는 `src/core/exception/validation_error.py`의 `to_error_enum()`으로 필드별 `ErrorEnum` 하나를 골라 400으로 응답하고, OpenAPI(`/docs`)에서도 422를 뺀다. 새 필드를 추가하면 그 파일의 위치→에러 표에도 추가한다.
+- `src/models/k8s_names.py`: 유저 ID·DNS-1035 이름·이미지 참조·env 이름 형식 규칙의 유일한 정의(`Annotated` 타입과 `is_*` 함수). schema·model·service가 함께 쓴다.
+- `src/services/job_templates.py`: 템플릿 → 매니페스트 생성과 서버 고정 값(크기 프리셋, 보안 설정, 라벨 등). job 타입을 추가할 때는 `models/user_job.py`의 템플릿 모델과 이 파일의 생성 함수·`KINDS_BY_TYPE`을 함께 늘린다.
 - 이슈 트래커: GitHub Project (`/feat`가 `.claude/skills/feat/github.md`의 `gh` 명령으로 이슈·상태·PR 관리, 비어 있으면 연동 안 함)
   - owner: `SeonminKim1`
   - Project 번호: `3`, 제목: `pj-k8s-fastapi-watcher` (https://github.com/users/SeonminKim1/projects/3, 저장소 `SeonminKim1/pj-k8s-fastapi-watcher`에 연결됨)

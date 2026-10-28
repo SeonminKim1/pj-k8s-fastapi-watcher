@@ -52,3 +52,11 @@
 - `src/repository/user_job_repository.py`: `update_status_if(job_id, from_status, ...)` → `update_status_from(job_id, from_statuses, ...)`(`status: {$in: [...]}`). `insert`는 `DuplicateKeyError`의 `keyPattern`이 이름 인덱스일 때만 `DuplicateJobNameError`.
 - `src/services/user_job_service.py`: `update_job_status`의 재시도 루프 제거(조건부 갱신 1회 + 실패 시 읽어서 판단). `_require_user_id`로 모든 owner_id 인자 검증. Job 이름 DNS-1123 label.
 - `src/core/dependencies.py`: `close_k8s_service()` 추가. `src/main.py`: lifespan 시작 단계를 `try` 안으로.
+
+## 변경: 2026-10-28 템플릿 입력·개수 한도(api-job-create)
+- 이 도메인의 변경은 `docs/api-job-create/plan.md`에서 계획·구현했다. 요약:
+  - `src/models/user_job.py`: `WebTemplate`·`JobTemplate`·`JobSize`·`MAX_JOBS_PER_USER`, `UserJob.template`·`quota_slot`. `ALLOWED_RESOURCE_KINDS` 제거(→ `services/job_templates.py`의 `KINDS_BY_TYPE`)
+  - `src/models/k8s_names.py`(신규): 형식 규칙을 service에서 옮김
+  - `src/repository/user_job_repository.py`: `insert` → `insert_with_slot`, `uniq_owner_slot` 인덱스
+  - `src/services/user_job_service.py`: `create_job(owner_id, name, template)`, owner_id 형식 오류는 `INVALID_USER_ID`, `_build_resources` 등 매니페스트 검증 제거
+  - `ErrorEnum`: `INVALID_JOB_RESOURCE` 제거, `INVALID_USER_ID`·`INVALID_JOB_NAME`·`JOB_QUOTA_EXCEEDED` 등 추가
