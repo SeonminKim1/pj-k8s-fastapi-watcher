@@ -210,10 +210,11 @@ gh project field-list <number> --owner <owner> --format json \
 
 **TASK: 이슈 생성** (사용자가 작업 계획을 확인한 뒤, 이슈가 없는 작업만)
 ```bash
-gh issue create --title "T1 [<feature-name>] <작업 내용>" \
+gh issue create --title "T1 [<feature-name>] <작업 내용>" --assignee @me \
   --body "선행: <없음|#번호>"$'\n\n'"문서: docs/<feature-name>/task.md"   # 출력: 이슈 URL
 gh project item-add <number> --owner <owner> --url <이슈 URL> --format json --jq .id   # 아이템 ID
 ```
+- 담당자는 `--assignee @me`로 `gh`에 로그인한 사용자 본인으로 지정합니다.
 - 생성 후 `task.md`의 해당 작업 끝에 `— #<이슈 번호>`를 붙입니다.
 - 아이템 ID는 저장하지 않습니다. 필요할 때 `item-add`를 다시 실행하면 기존 아이템 ID가 그대로 반환됩니다.
 
