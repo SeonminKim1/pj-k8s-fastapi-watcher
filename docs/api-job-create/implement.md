@@ -14,6 +14,9 @@
 - ■ 3단계 완료 — 다음: 4단계 T6
 - ▶ 4단계 (순차) T6 시작 — 쓰지 않게 된 옛 매니페스트 검증 코드 제거
 - ✔ T6 완료 — service 정규식·이름 검사 함수·`_build_resources`, repository `insert`, `ALLOWED_RESOURCE_KINDS`, `INVALID_JOB_RESOURCE` 제거(116줄 삭제). 동작 변화 없음, pytest 175 passed (#13)
+- ■ 4단계 완료 — 다음: 5단계 T7
+- ▶ 5단계 (순차) T7 시작 — schema·`POST /jobs` router·검증 에러 핸들러 연결
+- ✔ T7 완료 — `src/schemas/job.py`, `src/schemas/error.py`, `src/routers/job_router.py`, `src/main.py`(라우터 등록, `RequestValidationError` → 400 핸들러), `tests/test_job_router.py`. pytest 205 passed (#14)
 
 ## spec과 달라진 점
 - 없음
@@ -27,4 +30,5 @@
 - [ ] task.md 체크리스트 모두 완료
 
 ## 메모
+- `gh issue close`가 `Could not close the issue`를 내면서도 실제로는 닫혔다(#13). 지난 기능과 같은 현상이라 `gh issue view`로 상태만 확인했다.
 - **T4 로컬 MongoDB 확인**(9.0.2 standalone, 임시 DB `k8s_client_t4_check`, 확인 후 삭제): 인덱스 3개 생성(`uniq_owner_slot` partial `{is_deleted: false, quota_slot: {$exists: true}}`), 10개 저장 시 슬롯 0~9, 11번째 한도 초과, 한도가 찬 상태의 중복 이름은 한도 초과가 먼저, soft delete 후 비운 슬롯(3) 재사용, 빈 슬롯이 있을 때 중복 이름은 이름 중복, **동시 15개 → 정확히 10개 성공·나머지 한도 초과**, 같은 이름 동시 5개 → 1개 성공, `quota_slot` 없는 옛 문서 여러 개 저장 가능. 확인 스크립트는 저장소에 두지 않고 확인 후 scratchpad에서도 지웠다. repository를 고치면 같은 항목을 다시 확인한다.

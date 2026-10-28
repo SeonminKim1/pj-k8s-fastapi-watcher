@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
@@ -12,6 +13,8 @@ from src.core.dependencies import (
     get_user_job_repository,
 )
 from src.core.exception.my_exception import MyApiError
+from src.core.exception.validation_error import to_error_enum
+from src.routers import job_router
 
 
 # 앱 시작 시 클러스터 설정을 읽고 컬렉션 인덱스를 만든다(이미 있으면 그대로).
@@ -29,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(job_router.router)
 
 
 # MyApiError는 error_enum에 담긴 상태 코드로 구조화된 JSON 응답을 돌려준다.
@@ -37,6 +41,19 @@ async def my_api_error_handler(request: Request, exc: MyApiError) -> JSONRespons
     return JSONResponse(
         status_code=exc.error_enum.status_code,
         content={"code": exc.error_enum.code, "message": exc.error_enum.message},
+    )
+
+
+# 요청 검증 에러(FastAPI 기본 422)는 400으로 바꾸고, 첫 번째(우선순위가 가장 높은) 에러 하나를
+# 필드별 ErrorEnum의 code·message로 알려준다(CLAUDE.md "에러 상태 코드": 400/404/500만 쓴다).
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    error = to_error_enum(exc.errors())
+    return JSONResponse(
+        status_code=error.status_code,
+        content={"code": error.code, "message": error.message},
     )
 
 
