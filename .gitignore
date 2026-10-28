@@ -150,6 +150,8 @@ activemq-data/
 *.sage.py
 
 # Environments
+*.py[oc]
+.venv
 .env
 .envrc
 .venv
@@ -207,6 +209,7 @@ tempCodeRunnerFile.py
 
 # Ruff stuff:
 .ruff_cache/
+.pytest_cache/
 
 # PyPI configuration file
 .pypirc

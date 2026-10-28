@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv *)"
+    ],
+    "deny": ["Bash(rm -rf *)", "Bash(env)", "Bash(export)"]
+  },
+  "bashOutputMaxChars": 10000
+}
