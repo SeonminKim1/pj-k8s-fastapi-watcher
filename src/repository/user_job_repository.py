@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from datetime import datetime
 from typing import Any
 
@@ -12,6 +13,10 @@ from src.models.user_job import JobStatus, UserJob
 
 class DuplicateJobNameError(Exception):
     """삭제되지 않은 job 중 (owner_id, name)이 겹쳐 유니크 인덱스에 걸렸을 때 발생한다."""
+
+
+# 이름 유니크 인덱스(uniq_owner_name)의 키. 중복 에러가 이 인덱스에서 났는지 구분할 때 쓴다.
+_OWNER_NAME_KEY = {"owner_id": 1, "name": 1}
 
 
 # 문자열 ID를 ObjectId로 바꾼다. 형식이 틀리면 None(= 없는 job으로 취급).
@@ -52,7 +57,10 @@ class UserJobRepository:
         try:
             result = await self.collection.insert_one(doc)
         except DuplicateKeyError as e:
-            raise DuplicateJobNameError from e
+            # 이름 인덱스 위반만 이름 중복으로 바꾼다. 다른 유니크 위반은 그대로 올려 500(db_error)으로 처리된다.
+            if (e.details or {}).get("keyPattern") == _OWNER_NAME_KEY:
+                raise DuplicateJobNameError from e
+            raise
         doc["_id"] = result.inserted_id
         return _to_model(doc)
 
@@ -71,15 +79,23 @@ class UserJobRepository:
         doc = await self.collection.find_one({"_id": oid, "is_deleted": False})
         return _to_model(doc) if doc else None
 
-    # 현재 상태가 from_status일 때만 to_status로 원자적으로 바꾼다. 조건이 어긋나면 None.
-    async def update_status_if(
-        self, job_id: str, from_status: JobStatus, to_status: JobStatus, now: datetime
+    # 현재 상태가 from_statuses 중 하나일 때만 to_status로 원자적으로 바꾼다. 조건이 어긋나면 None.
+    async def update_status_from(
+        self,
+        job_id: str,
+        from_statuses: Collection[JobStatus],
+        to_status: JobStatus,
+        now: datetime,
     ) -> UserJob | None:
         oid = _to_object_id(job_id)
         if oid is None:
             return None
         doc = await self.collection.find_one_and_update(
-            {"_id": oid, "is_deleted": False, "status": from_status.value},
+            {
+                "_id": oid,
+                "is_deleted": False,
+                "status": {"$in": [s.value for s in from_statuses]},
+            },
             {"$set": {"status": to_status.value, "updated_at": now}},
             return_document=ReturnDocument.AFTER,
         )

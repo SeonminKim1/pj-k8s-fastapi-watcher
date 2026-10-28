@@ -47,3 +47,8 @@
 - **repository는 실제 MongoDB로 테스트하지 않는다**(테스트 규칙). partial 유니크 인덱스와 조건부 갱신이 실제로 동작하는지는 로컬 MongoDB에 붙여 한 번 직접 확인하고 `implement.md`에 남긴다.
 - **앱 시작에 MongoDB가 필요해진다.** lifespan의 `ensure_indexes()` 때문에 MongoDB 없이는 앱이 뜨지 않는다. 스모크 테스트는 `TestClient(app)`를 `with` 없이 써서 lifespan을 타지 않으므로 영향 없다.
 - 기존 `get_client()`/`get_database()`의 반환 타입이 바뀐다. 아직 사용처가 없어 영향 없다.
+
+## 변경: 2026-10-28 코드 리뷰 반영
+- `src/repository/user_job_repository.py`: `update_status_if(job_id, from_status, ...)` → `update_status_from(job_id, from_statuses, ...)`(`status: {$in: [...]}`). `insert`는 `DuplicateKeyError`의 `keyPattern`이 이름 인덱스일 때만 `DuplicateJobNameError`.
+- `src/services/user_job_service.py`: `update_job_status`의 재시도 루프 제거(조건부 갱신 1회 + 실패 시 읽어서 판단). `_require_user_id`로 모든 owner_id 인자 검증. Job 이름 DNS-1123 label.
+- `src/core/dependencies.py`: `close_k8s_service()` 추가. `src/main.py`: lifespan 시작 단계를 `try` 안으로.

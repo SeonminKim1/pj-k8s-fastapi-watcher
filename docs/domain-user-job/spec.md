@@ -56,10 +56,8 @@
 2. **`list_jobs(owner_id) -> list[UserJob]`**: `owner_id`가 유저 ID 형식이 아니면 `INVALID_PARAMETER`. 삭제되지 않은 자기 job을 `created_at` 내림차순으로 반환. 없으면 빈 목록
 3. **`get_job(owner_id, job_id) -> UserJob`**: `owner_id` 형식 오류는 `INVALID_PARAMETER`. 자기 job이 아니거나, 없거나, 삭제됐거나, `job_id`가 ObjectId 형식이 아니면 모두 `JOB_NOT_FOUND`(다른 유저 job의 존재를 드러내지 않음)
 4. **`update_job_status(job_id, status) -> UserJob`**: operator 전용이라 소유자 확인 없음
-   1. job이 없거나 삭제됐으면 `JOB_NOT_FOUND`
-   2. 현재 상태와 같으면 그대로 반환
-   3. 허용되지 않는 전이면 `INVALID_STATUS_TRANSITION`
-   4. "현재 상태가 허용된 이전 상태일 때만" 조건부 갱신으로 원자적으로 바꾸고 `updated_at` 갱신. 조건이 어긋나면(동시 갱신) 다시 읽어 2~3을 판단. 3번 연속 어긋나면 `INVALID_STATUS_TRANSITION`(무한 재시도 방지, operator가 다음 이벤트·resync에서 다시 시도)
+   1. 전이 표에서 목표 `status`로 갈 수 있는 이전 상태 목록을 구하고, "현재 상태가 그 목록 중 하나일 때만" 조건부 갱신(`status: {$in: [...]}`) 한 번으로 원자적으로 바꾸고 `updated_at` 갱신. 재시도하지 않는다
+   2. 갱신되지 않았으면 다시 읽어 판단: job이 없거나 삭제됐으면 `JOB_NOT_FOUND`, 현재 상태와 같으면 변경 없이 그대로 반환(멱등), 그 외는 `INVALID_STATUS_TRANSITION`
 5. **`delete_job(owner_id, job_id) -> None`**: `owner_id` 형식 오류는 `INVALID_PARAMETER`. `get_job`과 같은 조건이면 `JOB_NOT_FOUND`. 아니면 `is_deleted=true`, `deleted_at=updated_at=now`. 클러스터 리소스 정리는 operator가 한다
 
 ## 의존성 주입

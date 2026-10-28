@@ -23,9 +23,6 @@ _DNS_SUBDOMAIN_RE = re.compile(
 # DNS-1035 label: Service 이름 (영문 소문자로 시작, 1~63자, 점 불가). 클러스터 DNS 이름으로 쓰인다.
 _DNS_1035_LABEL_RE = re.compile(r"^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$")
 
-# 동시 갱신으로 조건부 갱신이 어긋났을 때 다시 읽어 판단하는 최대 횟수
-_STATUS_UPDATE_RETRIES = 3
-
 
 def _is_user_id(value: Any) -> bool:
     return isinstance(value, str) and bool(_USER_ID_RE.fullmatch(value))
@@ -147,22 +144,23 @@ class UserJobService:
             raise MyApiError(ErrorEnum.JOB_NOT_FOUND)
         return job
 
-    # operator 전용 상태 갱신. 같은 상태면 그대로 반환하고, 허용된 전이만 조건부로 원자적으로 바꾼다.
+    # operator 전용 상태 갱신. 목표 상태로 갈 수 있는 이전 상태일 때만 한 번의 조건부 갱신으로 원자적으로 바꾼다.
+    # 갱신되지 않았을 때만 다시 읽어 이유를 판단한다: 없음·삭제됨 → JOB_NOT_FOUND, 이미 같은 상태 → 그대로 반환(멱등),
+    # 그 외 → INVALID_STATUS_TRANSITION.
     async def update_job_status(self, job_id: str, status: JobStatus) -> UserJob:
-        for _ in range(_STATUS_UPDATE_RETRIES):
-            job = await self.repository.find_active_by_id(job_id)
-            if job is None:
-                raise MyApiError(ErrorEnum.JOB_NOT_FOUND)
-            if job.status == status:
-                return job
-            if status not in ALLOWED_STATUS_TRANSITIONS[job.status]:
-                raise MyApiError(ErrorEnum.INVALID_STATUS_TRANSITION)
-            updated = await self.repository.update_status_if(
-                job_id, job.status, status, datetime.now(UTC)
-            )
-            if updated is not None:
-                return updated
-            # 읽은 뒤 다른 갱신이 끼어들었다. 다시 읽어 판단한다.
+        sources = [
+            s for s, targets in ALLOWED_STATUS_TRANSITIONS.items() if status in targets
+        ]
+        updated = await self.repository.update_status_from(
+            job_id, sources, status, datetime.now(UTC)
+        )
+        if updated is not None:
+            return updated
+        job = await self.repository.find_active_by_id(job_id)
+        if job is None:
+            raise MyApiError(ErrorEnum.JOB_NOT_FOUND)
+        if job.status == status:
+            return job
         raise MyApiError(ErrorEnum.INVALID_STATUS_TRANSITION)
 
     # 자기 job을 soft delete한다. 클러스터 리소스 정리는 operator가 한다.

@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +18,7 @@ class FakeUserJobRepository:
         self._seq = 0
         # 조건부 갱신 직전에 다른 갱신이 끼어드는 상황을 만들 때 쓴다.
         self.interfere_once: JobStatus | None = None
+        self.update_calls = 0
 
     async def insert(self, job_doc: dict[str, Any]) -> UserJob:
         for d in self.docs.values():
@@ -42,14 +44,23 @@ class FakeUserJobRepository:
         d = self.docs.get(job_id)
         return UserJob(id=job_id, **d) if d and not d["is_deleted"] else None
 
-    async def update_status_if(
-        self, job_id: str, from_status: JobStatus, to_status: JobStatus, now: datetime
+    async def update_status_from(
+        self,
+        job_id: str,
+        from_statuses: Collection[JobStatus],
+        to_status: JobStatus,
+        now: datetime,
     ) -> UserJob | None:
+        self.update_calls += 1
         if self.interfere_once is not None:
             self.docs[job_id]["status"] = self.interfere_once.value
             self.interfere_once = None
         d = self.docs.get(job_id)
-        if not d or d["is_deleted"] or d["status"] != from_status.value:
+        if (
+            not d
+            or d["is_deleted"]
+            or d["status"] not in {s.value for s in from_statuses}
+        ):
             return None
         d["status"], d["updated_at"] = to_status.value, now
         return UserJob(id=job_id, **d)
@@ -330,26 +341,43 @@ async def test_update_status_not_found(service: UserJobService, case: str) -> No
     assert_error(e, ErrorEnum.JOB_NOT_FOUND)
 
 
-# 읽은 뒤 다른 갱신이 끼어들면 다시 읽어 판단한다: 끼어든 값이 목표와 같으면 그대로 성공
+# 조건부 갱신 직전에 다른 갱신이 같은 목표 상태로 바꿔 놓으면: 갱신은 빗나가고, 다시 읽어 같은 상태이므로 그대로 성공
 async def test_update_status_concurrent_same_target(
     service: UserJobService, repo: FakeUserJobRepository
 ) -> None:
     job = await service.create_job("alice", "my-app", [manifest()])
     repo.interfere_once = JobStatus.RUNNING
-    assert (
-        await service.update_job_status(job.id, JobStatus.RUNNING)
-    ).status is JobStatus.RUNNING
+    result = await service.update_job_status(job.id, JobStatus.RUNNING)
+    assert result.status is JobStatus.RUNNING
+    assert repo.update_calls == 1
 
 
-# 끼어든 값에서 목표로 가는 전이가 허용되면 이어서 갱신
-async def test_update_status_concurrent_then_transition(
+# 끼어든 상태(failed)도 목표(running)의 허용된 이전 상태라면 한 번의 조건부 갱신으로 바로 성공
+async def test_update_status_concurrent_other_source(
     service: UserJobService, repo: FakeUserJobRepository
 ) -> None:
     job = await service.create_job("alice", "my-app", [manifest()])
     repo.interfere_once = JobStatus.FAILED
-    assert (
-        await service.update_job_status(job.id, JobStatus.RUNNING)
-    ).status is JobStatus.RUNNING
+    result = await service.update_job_status(job.id, JobStatus.RUNNING)
+    assert result.status is JobStatus.RUNNING
+    assert repo.update_calls == 1
+
+
+# 상태 갱신은 재시도 없이 조건부 갱신 한 번만 한다(허용 전이·금지 전이·같은 상태 모두)
+@pytest.mark.parametrize(
+    "target", [JobStatus.RUNNING, JobStatus.PENDING, JobStatus.FAILED]
+)
+async def test_update_status_single_write(
+    service: UserJobService, repo: FakeUserJobRepository, target: JobStatus
+) -> None:
+    job = await service.create_job("alice", "my-app", [manifest()])
+    await service.update_job_status(job.id, JobStatus.FAILED)
+    repo.update_calls = 0
+    try:
+        await service.update_job_status(job.id, target)
+    except MyApiError as e:
+        assert e.error_enum is ErrorEnum.INVALID_STATUS_TRANSITION
+    assert repo.update_calls == 1
 
 
 # --- delete_job ---

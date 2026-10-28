@@ -52,3 +52,5 @@
 ## 변경: 2026-10-28 코드 리뷰 반영
 - A(리뷰 1·2): Job 이름을 DNS-1123 label(63자)로 검사(Pod 라벨 `job-name` 값으로 복사되므로). `list_jobs`·`get_job`·`delete_job`도 `owner_id` 형식 오류면 `INVALID_PARAMETER`(`_require_user_id`). spec.md·모델 설명 갱신, 테스트 추가.
 - B(리뷰 3·7): lifespan의 시작 단계(`get_k8s_service()`, `ensure_indexes()`)를 `try` 안으로 옮겨, 시작 도중 실패해도 연결을 닫는다. 종료 시 `close_k8s_service()`로 K8s `ApiClient`(스레드 풀·커넥션 풀)도 닫고 캐시를 비운다. 테스트 3개 추가.
+- C(리뷰 4·5·6): 상태 갱신을 "읽기 → 판단 → 조건부 갱신 × 최대 3회"에서 "허용된 이전 상태 목록으로 `$in` 조건부 갱신 1회 → 실패 시에만 읽어 이유 판단"으로 바꿨다. 재시도 상수와, 재시도 소진 시 허용된 전이를 `INVALID_STATUS_TRANSITION`으로 알리던 문제가 함께 없어졌다. repository `update_status_if` → `update_status_from(from_statuses)`. `DuplicateKeyError`는 `keyPattern`이 `uniq_owner_name` 인덱스일 때만 `DuplicateJobNameError`로 바꾸고, 그 외는 그대로 올려 500. spec.md 갱신. 로컬 MongoDB로 확인(아래).
+  - 로컬 MongoDB 9.0.2 임시 DB(확인 후 삭제): `$in` 조건부 갱신 성공·빗나감(None), service 같은 상태 반환·`running→pending` 거부·`running→failed`, 이름 중복의 `keyPattern`이 `{owner_id: 1, name: 1}`, 다른 유니크 인덱스 위반은 `DuplicateKeyError` 그대로 올라옴.
