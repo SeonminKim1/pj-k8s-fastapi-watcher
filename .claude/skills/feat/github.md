@@ -39,6 +39,36 @@ gh pr create --base main --head feature/<feature-name> \
   --title "<feature-name>: <한 줄 요약>" --body-file <본문 파일> \
   --assignee @me --project "<Project 제목>"
 ```
-- 본문: 요약, `docs/<feature-name>/` 링크, 작업 이슈 번호(`#1 #2 …`, 이미 닫힌 이슈는 참조만), 주요 변경, 확인 결과(ruff·pytest·직접 확인·`/code-review`).
+- 본문은 아래 템플릿을 따른다. 한 줄에 내용을 몰아 쓰지 않는다: 작업은 한 줄에 하나씩, 긴 설명은 쉼표로 잇지 말고 하위 항목으로 나눈다.
+
+````markdown
+## 요약
+
+<무엇을 추가·변경했는지 1~2줄>
+<operator 패턴 등 전체 구조에서의 위치 1줄>
+
+- 문서: `docs/<feature-name>/` (PRD · SPEC · PLAN · TASK · IMPLEMENT)
+
+## 작업
+
+- [x] #<이슈> T1 <작업 요약>
+- [x] #<이슈> T2 <작업 요약>
+
+## 주요 변경
+
+### <영역> — `<경로>`
+- <항목 하나에 한 가지>
+  - <세부 규칙은 하위 항목>
+
+## 확인
+
+- `uv run ruff check .` 통과
+- `uv run pytest` <N> passed
+- <직접 확인한 것>
+- `/code-review` 지적 <N>건 반영
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+````
+- 이미 닫힌 이슈도 작업 목록에 `#번호`로 참조만 한다(`Closes #` 불필요).
 - PR은 `--project`로 직접 Project에 추가한다(Project 설정의 "Auto-add to project" 워크플로가 켜져 있지 않으면 자동으로 붙지 않는다).
 - 머지는 사용자가 한다. 작업별 커밋을 보존하도록 일반 머지(`gh pr merge <번호> --merge --delete-branch`)를 안내한다(squash 금지).
