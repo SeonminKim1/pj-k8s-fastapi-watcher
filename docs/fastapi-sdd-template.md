@@ -108,6 +108,7 @@ tar -cf - docs/fastapi-sdd-template.md sdd-process.md .claude/skills/feat .claud
 - 타입 힌트 필수. 모든 public 함수는 return type을 명시한다.
 - 함수/변수는 snake_case.
 - 모든 함수와 복잡한 로직에는 짧지만 빠른 이해에 도움이 되는 주석을 단다.
+- `models/`·`schemas/`의 Pydantic 필드에는 `Field(description=...)`로 설명을 단다(의미, 형식·제약, 누가 값을 정하는지). `schemas/`의 설명은 `/docs`에 그대로 노출된다.
 
 ## 테스트
 - `pytest`로 작성하고 `uv run pytest`로 실행한다. 테스트 파일은 `tests/test_<대상>.py`.
