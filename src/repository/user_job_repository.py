@@ -35,6 +35,7 @@ def _to_model(doc: dict[str, Any]) -> UserJob:
 class UserJobRepository:
     """user_jobs 컬렉션 접근만 담당한다. 비즈니스 판단은 service가 한다."""
 
+    # user_jobs 컬렉션을 주입받는다(조립은 core/dependencies.py).
     def __init__(self, collection: AsyncCollection) -> None:
         self.collection = collection
 

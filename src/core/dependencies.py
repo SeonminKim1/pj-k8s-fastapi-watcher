@@ -31,9 +31,11 @@ def close_k8s_service() -> None:
     get_k8s_service.cache_clear()
 
 
+# 공유 MongoDB 클라이언트의 user_jobs 컬렉션으로 repository를 만든다(요청마다 만들어도 가볍다).
 def get_user_job_repository() -> UserJobRepository:
     return UserJobRepository(get_database()["user_jobs"])
 
 
+# repository를 주입한 UserJobService를 만든다. 라우터는 Depends(get_user_job_service)로 받는다.
 def get_user_job_service() -> UserJobService:
     return UserJobService(get_user_job_repository())

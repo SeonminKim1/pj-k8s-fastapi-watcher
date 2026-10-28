@@ -24,14 +24,17 @@ _DNS_SUBDOMAIN_RE = re.compile(
 _DNS_1035_LABEL_RE = re.compile(r"^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$")
 
 
+# 유저 ID 형식(_USER_ID_RE)인지 본다. 문자열이 아니면 False.
 def _is_user_id(value: Any) -> bool:
     return isinstance(value, str) and bool(_USER_ID_RE.fullmatch(value))
 
 
+# DNS-1123 label(job 이름, Job 리소스 이름)인지 본다.
 def _is_dns_label(value: Any) -> bool:
     return isinstance(value, str) and bool(_DNS_LABEL_RE.fullmatch(value))
 
 
+# DNS-1123 subdomain(Deployment·ConfigMap 등 리소스 이름, 253자 이하)인지 본다.
 def _is_dns_subdomain(value: Any) -> bool:
     return (
         isinstance(value, str)
@@ -40,6 +43,7 @@ def _is_dns_subdomain(value: Any) -> bool:
     )
 
 
+# DNS-1035 label(Service 이름)인지 본다.
 def _is_dns_1035_label(value: Any) -> bool:
     return isinstance(value, str) and bool(_DNS_1035_LABEL_RE.fullmatch(value))
 
@@ -102,6 +106,7 @@ def _build_resources(
 class UserJobService:
     """user-job 비즈니스 로직. MongoDB 접근은 주입받은 repository로만 한다."""
 
+    # MongoDB 접근에 쓸 repository를 주입받는다(테스트는 가짜 repository).
     def __init__(self, repository: UserJobRepository) -> None:
         self.repository = repository
 

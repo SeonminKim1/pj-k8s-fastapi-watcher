@@ -1,4 +1,6 @@
-import importlib
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from kubernetes.config.config_exception import ConfigException
@@ -30,10 +32,26 @@ def config_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return calls
 
 
-# import만으로는 클러스터 설정을 읽지 않는다.
-def test_import_does_not_load_config(config_calls: list[str]) -> None:
-    importlib.reload(deps)
-    assert config_calls == []
+# import만으로는 클러스터 설정을 읽지 않는다. 이미 import된 모듈을 reload하면 다른 테스트가 쓰는 함수 객체가
+# 바뀌므로, 새 프로세스에서 설정 로딩 함수를 "호출되면 실패"하도록 바꾼 뒤 import해 본다.
+def test_import_does_not_load_config() -> None:
+    code = (
+        "from kubernetes import config\n"
+        "def fail(*a, **k):\n"
+        "    raise SystemExit('config loaded at import')\n"
+        "config.load_incluster_config = fail\n"
+        "config.load_kube_config = fail\n"
+        "import src.core.dependencies, src.main\n"
+    )
+    root = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=False,
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 # 처음 호출 때 in-cluster → kubeconfig 순으로 한 번만 읽고, 이후 같은 객체를 반환한다.
@@ -45,12 +63,15 @@ def test_get_k8s_service_loads_once(config_calls: list[str]) -> None:
     assert config_calls == ["incluster", "kubeconfig"]
 
 
-# service는 user_jobs 컬렉션을 쓰는 repository를 주입받는다(실제 DB 접속은 하지 않음).
-def test_get_user_job_service_wiring() -> None:
+# service는 user_jobs 컬렉션을 쓰는 repository를 주입받는다.
+# 실제 get_database()는 전역 MongoDB 클라이언트를 만들어 남기므로 가짜 DB로 바꾼다.
+def test_get_user_job_service_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
+    collections: dict[str, object] = {"user_jobs": object()}
+    monkeypatch.setattr(deps, "get_database", lambda: collections)
     service = deps.get_user_job_service()
     assert isinstance(service, UserJobService)
     assert isinstance(service.repository, UserJobRepository)
-    assert service.repository.collection.name == "user_jobs"
+    assert service.repository.collection is collections["user_jobs"]
 
 
 # close_k8s_service()는 만들어 둔 ApiClient를 닫고 캐시를 비운다. 다음 호출은 새로 만든다.
