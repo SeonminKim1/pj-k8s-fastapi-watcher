@@ -1,9 +1,11 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(uv *)"
-    ],
-    "deny": ["Bash(rm -rf *)", "Bash(env)", "Bash(export)"]
+    "allow": ["Bash(uv *)", "Bash(gh issue *)", "Bash(gh project *)", "Bash(gh auth status)"],
+    "deny": [
+      "Bash(rm -rf *)", "Bash(env)", "Bash(export)",
+      "Bash(gh issue delete *)", "Bash(gh project delete *)",
+      "Bash(gh project item-delete *)", "Bash(gh project item-archive *)"
+    ]
   },
   "bashOutputMaxChars": 10000
 }

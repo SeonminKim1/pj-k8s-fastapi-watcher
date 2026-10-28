@@ -1,0 +1,18 @@
+# PRD: user-job 도메인 모델
+- **배경/목적**: 서비스의 모든 기능(job 생성·조회·삭제 API, operator)이 같은 user-job 모델을 기준으로 동작한다. API나 operator를 만들기 전에 모델과 저장 방식, 의존성 주입 구조를 먼저 정해 이후 기능들이 같은 기준을 쓰게 한다.
+- **대상 사용자**: 이후 기능을 구현하는 개발자(내부 service·repository 계층). 최종 사용자에게 직접 노출되지 않는다.
+- **하는 일**: user-job은 한 유저가 만든 쿠버네티스 리소스 묶음(예: Deployment + Service)이다. job은 소유자(유저 ID), 네임스페이스, 구성 리소스 목록(종류·이름·매니페스트 원본), 상태를 가지며 MongoDB에 저장된다. 이번 기능은 이 모델과, job을 저장·조회·상태 갱신·삭제하는 repository와 service, 그리고 service·repository·`K8sService`를 생성자로 주입하는 구조까지 만든다.
+- **비즈니스 규칙/제약**:
+  - 유저 식별은 `CLAUDE.md`의 "유저 식별" 규칙(`X-User-Id`)을 따른다. job의 소유자는 이 유저 ID다.
+  - job은 소유자만 조회·변경할 수 있다. 다른 유저의 job에 접근하면 에러다. (추정)
+  - job 하나는 구성 리소스를 1개 이상 가진다. (추정)
+  - job은 operator가 리소스를 다시 만들 수 있도록 각 리소스의 매니페스트 원본을 가진다(`CLAUDE.md`의 "operator 패턴").
+  - job 상태는 operator가 관찰한 결과로 갱신한다. 상태 종류와 전이 규칙은 SPEC에서 정한다.
+  - job을 지워도 문서는 남기고 삭제 표시만 한다(soft delete). 클러스터 리소스 정리는 operator가 한다.
+  - job의 구성 리소스는 모두 소유자의 네임스페이스에 속한다(`CLAUDE.md`의 "유저별 네임스페이스").
+  - 에러 상태 코드는 `CLAUDE.md`의 "에러 상태 코드" 규칙(400/404/500)을 따른다.
+- **완료 기준**: service를 통해 유저별로 job을 저장하고, 자기 job 목록·단건을 조회하고, 상태를 갱신하고, 삭제할 수 있으며, 이를 확인하는 service 테스트가 가짜 repository 주입으로 통과한다. `K8sService`는 `src/core/dependencies.py`에서만 만들어진다.
+- **범위 제외**:
+  - HTTP API(생성·조회·삭제 엔드포인트) → 이후 `api-job-*`
+  - `K8sService`의 리소스 생성·삭제·watch 메서드와 operator 자체 → 이후 `component-job-operator`
+- **관련 요구사항**: `CLAUDE.md`의 "유저 식별", "유저별 네임스페이스", "에러 상태 코드", "핵심 도메인 — user-job", "operator 패턴", "의존성 주입"

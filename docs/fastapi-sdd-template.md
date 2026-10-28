@@ -7,7 +7,7 @@
 |---|---|
 | `docs/fastapi-sdd-template.md` | 코드 규칙, SDD 작업 규칙, 부트스트랩 절차 (이 파일) |
 | `sdd-process.md` | 단계별 진행 기준, 문서 템플릿, 문서 관리 규칙 |
-| `.claude/skills/feat/SKILL.md` | `/feat` 스킬: 기능 추가/수정 진행 |
+| `.claude/skills/feat/SKILL.md` | `/feat` 스킬: 기능 추가/수정 진행 (같은 폴더의 `github.md`: GitHub Project 연동 명령) |
 | `.claude/settings.json` | Claude Code 권한 설정(`uv` 명령 허용, 위험 명령 차단) |
 
 새 프로젝트로 옮기기(경로를 유지한 채 복사):
@@ -27,6 +27,7 @@ tar -cf - docs/fastapi-sdd-template.md sdd-process.md .claude/skills/feat .claud
 | `sdd-process.md` | 사람 + Claude | 단계별 진행 기준과 문서 템플릿 | 코드 규칙 |
 | `docs/<feature-name>/*.md` | 사람 + Claude | 기능 하나의 PRD~구현 기록 | 서비스 전체 요구사항(→ `CLAUDE.md`) |
 | `.claude/skills/feat/SKILL.md` | Claude | `/feat` 실행 절차 | 단계별 문서 템플릿(→ `sdd-process.md`) |
+| `.claude/skills/feat/github.md` | Claude | GitHub Project 연동 `gh` 명령(이슈·상태·PR) | 연동 시점·규칙(→ `sdd-process.md`) |
 | `.claude/settings.json` | Claude Code | 팀 공통 권한 설정 | 개인 설정(→ `.claude/settings.local.json`) |
 
 - 같은 내용을 두 군데에 쓰지 않는다. 필요하면 링크(README) 또는 `@import`(CLAUDE.md)로 연결한다.
@@ -108,6 +109,7 @@ tar -cf - docs/fastapi-sdd-template.md sdd-process.md .claude/skills/feat .claud
 - 타입 힌트 필수. 모든 public 함수는 return type을 명시한다.
 - 함수/변수는 snake_case.
 - 모든 함수와 복잡한 로직에는 짧지만 빠른 이해에 도움이 되는 주석을 단다.
+- `models/`·`schemas/`의 Pydantic 필드에는 `Field(description=...)`로 설명을 단다(의미, 형식·제약, 누가 값을 정하는지). `schemas/`의 설명은 `/docs`에 그대로 노출된다.
 
 ## 테스트
 - `pytest`로 작성하고 `uv run pytest`로 실행한다. 테스트 파일은 `tests/test_<대상>.py`.
