@@ -184,6 +184,38 @@ async def test_create_job_subdomain_name_ok(service: UserJobService) -> None:
     assert [r.name for r in job.resources] == ["1web.v1", "a" * 64]
 
 
+# Job 이름은 DNS-1123 label: 64자 이상·점 포함은 거부, 63자는 허용
+@pytest.mark.parametrize("name", ["a" * 64, "a.b"])
+async def test_create_job_invalid_job_name(service: UserJobService, name: str) -> None:
+    with pytest.raises(MyApiError) as e:
+        await service.create_job("alice", "my-app", [manifest("Job", name, "batch/v1")])
+    assert_error(e, ErrorEnum.INVALID_JOB_RESOURCE)
+
+
+async def test_create_job_job_name_max_length_ok(service: UserJobService) -> None:
+    job = await service.create_job(
+        "alice", "my-app", [manifest("Job", "a" * 63, "batch/v1")]
+    )
+    assert job.resources[0].name == "a" * 63
+
+
+# owner_id를 받는 조회·삭제도 유저 ID 형식이 틀리면 INVALID_PARAMETER(400)
+@pytest.mark.parametrize("method", ["list", "get", "delete"])
+@pytest.mark.parametrize("owner_id", ["", "Bad_User!"])
+async def test_invalid_owner_id_on_read_delete(
+    service: UserJobService, method: str, owner_id: str
+) -> None:
+    job = await service.create_job("alice", "my-app", [manifest()])
+    calls = {
+        "list": lambda: service.list_jobs(owner_id),
+        "get": lambda: service.get_job(owner_id, job.id),
+        "delete": lambda: service.delete_job(owner_id, job.id),
+    }
+    with pytest.raises(MyApiError) as e:
+        await calls[method]()
+    assert_error(e, ErrorEnum.INVALID_PARAMETER)
+
+
 # 같은 이름이라도 kind가 다르면 허용
 async def test_create_job_same_name_different_kind_ok(service: UserJobService) -> None:
     job = await service.create_job(

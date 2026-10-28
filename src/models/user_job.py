@@ -37,7 +37,7 @@ class JobResource(BaseModel):
     api_version: str = Field(description="매니페스트의 apiVersion. 예: apps/v1")
     kind: str = Field(description="매니페스트의 kind. ALLOWED_RESOURCE_KINDS 중 하나")
     name: str = Field(
-        description="매니페스트의 metadata.name. Service는 DNS-1035 label(1~63자), 나머지는 DNS-1123 subdomain(1~253자)"
+        description="매니페스트의 metadata.name. Service는 DNS-1035 label(1~63자), Job은 DNS-1123 label(1~63자), 나머지는 DNS-1123 subdomain(1~253자)"
     )
     manifest: dict[str, Any] = Field(
         description="operator가 server-side apply할 매니페스트 원본. metadata.namespace는 job 네임스페이스로 채워진다"

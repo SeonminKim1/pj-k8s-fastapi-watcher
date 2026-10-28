@@ -47,11 +47,22 @@ def _is_dns_1035_label(value: Any) -> bool:
     return isinstance(value, str) and bool(_DNS_1035_LABEL_RE.fullmatch(value))
 
 
-# kind별 리소스 이름 규칙. Service는 DNS-1035 label, 나머지는 DNS-1123 subdomain.
+# kind별 리소스 이름 규칙.
+# - Service: DNS-1035 label (클러스터 DNS 이름으로 쓰임)
+# - Job: DNS-1123 label (Job 컨트롤러가 이름을 Pod 라벨 job-name 값으로 복사하는데, 라벨 값은 63자 제한)
+# - 나머지: DNS-1123 subdomain
 def _is_valid_resource_name(kind: str, name: Any) -> bool:
     if kind == "Service":
         return _is_dns_1035_label(name)
+    if kind == "Job":
+        return _is_dns_label(name)
     return _is_dns_subdomain(name)
+
+
+# 유저 ID 형식이 틀리면 INVALID_PARAMETER(400). owner_id를 받는 모든 메서드의 첫 검사다.
+def _require_user_id(owner_id: Any) -> None:
+    if not _is_user_id(owner_id):
+        raise MyApiError(ErrorEnum.INVALID_PARAMETER)
 
 
 # 매니페스트 목록을 검증해 JobResource로 바꾼다. namespace는 job 네임스페이스로 채운다.
@@ -101,7 +112,8 @@ class UserJobService:
     async def create_job(
         self, owner_id: str, name: str, manifests: list[dict[str, Any]]
     ) -> UserJob:
-        if not _is_user_id(owner_id) or not _is_dns_label(name):
+        _require_user_id(owner_id)
+        if not _is_dns_label(name):
             raise MyApiError(ErrorEnum.INVALID_PARAMETER)
         namespace = f"user-{owner_id}"
         resources = _build_resources(manifests, namespace)
@@ -124,10 +136,12 @@ class UserJobService:
 
     # 삭제되지 않은 자기 job을 최신순으로 반환한다.
     async def list_jobs(self, owner_id: str) -> list[UserJob]:
+        _require_user_id(owner_id)
         return await self.repository.find_active_by_owner(owner_id)
 
-    # 자기 job 하나를 반환한다. 남의 job·없음·삭제됨·잘못된 ID는 모두 JOB_NOT_FOUND.
+    # 자기 job 하나를 반환한다. 유저 ID 형식 오류는 INVALID_PARAMETER, 남의 job·없음·삭제됨·잘못된 ID는 모두 JOB_NOT_FOUND.
     async def get_job(self, owner_id: str, job_id: str) -> UserJob:
+        _require_user_id(owner_id)
         job = await self.repository.find_active_by_id(job_id)
         if job is None or job.owner_id != owner_id:
             raise MyApiError(ErrorEnum.JOB_NOT_FOUND)
@@ -153,6 +167,7 @@ class UserJobService:
 
     # 자기 job을 soft delete한다. 클러스터 리소스 정리는 operator가 한다.
     async def delete_job(self, owner_id: str, job_id: str) -> None:
+        _require_user_id(owner_id)
         deleted = await self.repository.soft_delete(owner_id, job_id, datetime.now(UTC))
         if not deleted:
             raise MyApiError(ErrorEnum.JOB_NOT_FOUND)

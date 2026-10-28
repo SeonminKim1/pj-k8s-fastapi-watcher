@@ -20,7 +20,7 @@
 |---|---|---|
 | `api_version` | `str` | 예: `apps/v1` |
 | `kind` | `str` | 허용 목록 중 하나 |
-| `name` | `str` | kind별 쿠버네티스 이름 규칙. `Service`는 DNS-1035 label(영문 소문자로 시작, 소문자·숫자·`-`, 영숫자로 끝, 1~63자), 나머지는 DNS-1123 subdomain(소문자·숫자·`-`·`.`, 1~253자) |
+| `name` | `str` | kind별 쿠버네티스 이름 규칙. `Service`는 DNS-1035 label(영문 소문자로 시작, 소문자·숫자·`-`, 영숫자로 끝, 1~63자), `Job`은 DNS-1123 label(1~63자, 이름이 Pod 라벨 `job-name` 값으로 복사됨), 나머지는 DNS-1123 subdomain(소문자·숫자·`-`·`.`, 1~253자) |
 | `manifest` | `dict` | operator가 server-side apply할 매니페스트 원본 |
 
 - `api_version`·`kind`·`name`은 `manifest`에서 꺼낸 값이며 조회·인덱싱용이다. 입력으로는 `manifest`만 받는다.
@@ -53,14 +53,14 @@
       - 같은 `(kind, name)`이 job 안에서 중복
    3. `namespace=user-{owner_id}`, `status=pending`, `is_deleted=false`, `created_at=updated_at=now`, `deleted_at=None`으로 저장
    4. 유니크 인덱스 위반(동시 요청 포함)이면 `JOB_NAME_DUPLICATED`
-2. **`list_jobs(owner_id) -> list[UserJob]`**: 삭제되지 않은 자기 job을 `created_at` 내림차순으로 반환. 없으면 빈 목록
-3. **`get_job(owner_id, job_id) -> UserJob`**: 자기 job이 아니거나, 없거나, 삭제됐거나, `job_id`가 ObjectId 형식이 아니면 모두 `JOB_NOT_FOUND`(다른 유저 job의 존재를 드러내지 않음)
+2. **`list_jobs(owner_id) -> list[UserJob]`**: `owner_id`가 유저 ID 형식이 아니면 `INVALID_PARAMETER`. 삭제되지 않은 자기 job을 `created_at` 내림차순으로 반환. 없으면 빈 목록
+3. **`get_job(owner_id, job_id) -> UserJob`**: `owner_id` 형식 오류는 `INVALID_PARAMETER`. 자기 job이 아니거나, 없거나, 삭제됐거나, `job_id`가 ObjectId 형식이 아니면 모두 `JOB_NOT_FOUND`(다른 유저 job의 존재를 드러내지 않음)
 4. **`update_job_status(job_id, status) -> UserJob`**: operator 전용이라 소유자 확인 없음
    1. job이 없거나 삭제됐으면 `JOB_NOT_FOUND`
    2. 현재 상태와 같으면 그대로 반환
    3. 허용되지 않는 전이면 `INVALID_STATUS_TRANSITION`
    4. "현재 상태가 허용된 이전 상태일 때만" 조건부 갱신으로 원자적으로 바꾸고 `updated_at` 갱신. 조건이 어긋나면(동시 갱신) 다시 읽어 2~3을 판단. 3번 연속 어긋나면 `INVALID_STATUS_TRANSITION`(무한 재시도 방지, operator가 다음 이벤트·resync에서 다시 시도)
-5. **`delete_job(owner_id, job_id) -> None`**: `get_job`과 같은 조건이면 `JOB_NOT_FOUND`. 아니면 `is_deleted=true`, `deleted_at=updated_at=now`. 클러스터 리소스 정리는 operator가 한다
+5. **`delete_job(owner_id, job_id) -> None`**: `owner_id` 형식 오류는 `INVALID_PARAMETER`. `get_job`과 같은 조건이면 `JOB_NOT_FOUND`. 아니면 `is_deleted=true`, `deleted_at=updated_at=now`. 클러스터 리소스 정리는 operator가 한다
 
 ## 의존성 주입
 - **`K8sService(api_client: ApiClient)`**: 생성자에서 kubeconfig를 읽지 않고, 받은 `ApiClient`로 `CoreV1Api`·`AppsV1Api` 등을 만든다. 이번 기능에서는 메서드를 추가하지 않는다.
@@ -76,7 +76,7 @@
 
 | 상황 | `ErrorEnum` (`code`) | 상태 코드 |
 |---|---|---|
-| owner_id 형식 오류, job 이름 형식 오류 | `INVALID_PARAMETER` (`invalid_parameter`) | 400 |
+| owner_id 형식 오류(모든 owner_id 인자), job 이름 형식 오류 | `INVALID_PARAMETER` (`invalid_parameter`) | 400 |
 | 매니페스트 없음·허용 목록 밖·형식 오류·네임스페이스 불일치·중복 | `INVALID_JOB_RESOURCE` (`invalid_job_resource`) | 400 |
 | 삭제되지 않은 job 중 같은 이름 존재 | `JOB_NAME_DUPLICATED` (`job_name_duplicated`) | 400 |
 | 허용되지 않는 상태 전이 | `INVALID_STATUS_TRANSITION` (`invalid_status_transition`) | 400 |

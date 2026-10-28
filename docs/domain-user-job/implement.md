@@ -48,3 +48,6 @@
 ## 변경: 2026-10-28 Service 이름 규칙(DNS-1035) 적용, 에러 규칙 500 명시
 - Service 이름이 DNS-1123 subdomain으로만 검사돼 `1web`, `web.v1` 같은 이름이 저장 단계를 통과하고 operator apply에서야 실패하던 문제를 고쳤다. `_is_valid_resource_name(kind, name)`으로 kind별 규칙을 적용(Service는 DNS-1035 label). spec.md·모델 설명 갱신, 테스트 4개 추가.
 - 사용자가 PRD의 에러 규칙을 400/404/500으로 수정함 → `CLAUDE.md` "에러 상태 코드"와 spec.md를 맞춤(비즈니스 에러는 400·404, 500은 전역 핸들러만).
+
+## 변경: 2026-10-28 코드 리뷰 반영
+- A(리뷰 1·2): Job 이름을 DNS-1123 label(63자)로 검사(Pod 라벨 `job-name` 값으로 복사되므로). `list_jobs`·`get_job`·`delete_job`도 `owner_id` 형식 오류면 `INVALID_PARAMETER`(`_require_user_id`). spec.md·모델 설명 갱신, 테스트 추가.
