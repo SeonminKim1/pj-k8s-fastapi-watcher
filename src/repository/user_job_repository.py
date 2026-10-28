@@ -15,8 +15,14 @@ class DuplicateJobNameError(Exception):
     """삭제되지 않은 job 중 (owner_id, name)이 겹쳐 유니크 인덱스에 걸렸을 때 발생한다."""
 
 
+class JobQuotaExceededError(Exception):
+    """유저의 삭제되지 않은 job이 슬롯 수만큼 있어 더 저장할 수 없을 때 발생한다."""
+
+
 # 이름 유니크 인덱스(uniq_owner_name)의 키. 중복 에러가 이 인덱스에서 났는지 구분할 때 쓴다.
 _OWNER_NAME_KEY = {"owner_id": 1, "name": 1}
+# 개수 한도 슬롯 유니크 인덱스(uniq_owner_slot)의 키. 동시 요청과 슬롯이 겹쳤는지 구분할 때 쓴다.
+_OWNER_SLOT_KEY = {"owner_id": 1, "quota_slot": 1}
 
 
 # 문자열 ID를 ObjectId로 바꾼다. 형식이 틀리면 None(= 없는 job으로 취급).
@@ -39,13 +45,23 @@ class UserJobRepository:
     def __init__(self, collection: AsyncCollection) -> None:
         self.collection = collection
 
-    # 삭제되지 않은 job끼리 이름 유니크, 유저별 목록 조회용 인덱스를 만든다(이미 있으면 그대로).
+    # 삭제되지 않은 job끼리 이름 유니크·슬롯 유니크, 유저별 목록 조회용 인덱스를 만든다(이미 있으면 그대로).
     async def ensure_indexes(self) -> None:
         await self.collection.create_index(
             [("owner_id", 1), ("name", 1)],
             name="uniq_owner_name",
             unique=True,
             partialFilterExpression={"is_deleted": False},
+        )
+        # quota_slot이 없는 문서는 빼서, 없는 값(null)끼리 중복으로 걸리지 않게 한다.
+        await self.collection.create_index(
+            [("owner_id", 1), ("quota_slot", 1)],
+            name="uniq_owner_slot",
+            unique=True,
+            partialFilterExpression={
+                "is_deleted": False,
+                "quota_slot": {"$exists": True},
+            },
         )
         await self.collection.create_index(
             [("owner_id", 1), ("created_at", DESCENDING)],
@@ -64,6 +80,46 @@ class UserJobRepository:
             raise
         doc["_id"] = result.inserted_id
         return _to_model(doc)
+
+    # 삭제되지 않은 job이 차지한 슬롯 번호들.
+    async def _used_slots(self, owner_id: str) -> set[int]:
+        cursor = self.collection.find(
+            {
+                "owner_id": owner_id,
+                "is_deleted": False,
+                "quota_slot": {"$exists": True},
+            },
+            {"quota_slot": 1, "_id": 0},
+        )
+        return {doc["quota_slot"] async for doc in cursor}
+
+    # 빈 슬롯(0 ~ max_slots-1)을 골라 새 job 문서를 저장한다. 슬롯 유니크 인덱스가 개수 한도를 지킨다.
+    # - 빈 슬롯이 없으면 JobQuotaExceededError
+    # - 동시 요청과 슬롯이 겹치면 다시 골라 재시도. 겹칠 때마다 다른 요청이 슬롯을 하나 차지한 것이므로
+    #   max_slots번 겹치면 슬롯이 다 찬 것으로 보고 JobQuotaExceededError
+    # - 이름이 겹치면 DuplicateJobNameError, 그 외 유니크 위반은 그대로 올려 500(db_error)
+    async def insert_with_slot(
+        self, job_doc: dict[str, Any], max_slots: int
+    ) -> UserJob:
+        owner_id = job_doc["owner_id"]
+        for _ in range(max_slots):
+            used = await self._used_slots(owner_id)
+            slot = next((s for s in range(max_slots) if s not in used), None)
+            if slot is None:
+                raise JobQuotaExceededError
+            doc = {**job_doc, "quota_slot": slot}
+            try:
+                result = await self.collection.insert_one(doc)
+            except DuplicateKeyError as e:
+                key_pattern = (e.details or {}).get("keyPattern")
+                if key_pattern == _OWNER_NAME_KEY:
+                    raise DuplicateJobNameError from e
+                if key_pattern == _OWNER_SLOT_KEY:
+                    continue
+                raise
+            doc["_id"] = result.inserted_id
+            return _to_model(doc)
+        raise JobQuotaExceededError
 
     # 유저의 삭제되지 않은 job을 최신순으로 반환한다.
     async def find_active_by_owner(self, owner_id: str) -> list[UserJob]:
