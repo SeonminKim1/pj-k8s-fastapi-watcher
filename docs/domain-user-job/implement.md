@@ -38,3 +38,8 @@
 - 기본 DB `k8s_client`에 다른 컬렉션(`deploy_jobs`, `deploy_query_logs`)이 이미 있다. 이름은 겹치지 않지만 다른 프로젝트 데이터라면 `MONGO_DB_NAME`을 분리한다.
 - `gh issue close`가 `Could not close the issue` 오류를 내면서도 실제로는 닫히는 경우가 있었다(#4, #5). Project의 Status를 Done으로 바꾸면 이슈를 닫는 기본 워크플로와 겹친 것으로 추정한다(원인은 확인하지 않음).
 - 다음 기능: `api-job-*`(job 생성·조회·삭제 API, 클러스터 네임스페이스 생성 정책 포함), `component-job-operator`(K8sService 메서드, reconcile, resync).
+
+## 변경: 2026-10-28 모델 필드 설명 추가
+- `src/models/user_job.py`의 `JobResource`·`UserJob` 모든 필드에 `Field(description=...)` 추가(SPEC 모델 표 기준). 동작 변화 없음(필수/기본값 그대로).
+- `docs/fastapi-sdd-template.md` Python 규칙에 "models/·schemas/ 필드는 `Field(description=...)`" 추가.
+- 확인: ruff, pytest 통과. `UserJob.model_json_schema()`에 설명 포함 확인.
