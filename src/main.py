@@ -1,10 +1,28 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
+from src.core.db.mongodb import close_client
+from src.core.dependencies import get_k8s_service, get_user_job_repository
 from src.core.exception.my_exception import MyApiError
 
-app = FastAPI()
+
+# 앱 시작 시 클러스터 설정을 읽고 컬렉션 인덱스를 만든다(이미 있으면 그대로). 종료 시 MongoDB 연결을 닫는다.
+# 클러스터 설정(in-cluster·kubeconfig)이나 MongoDB가 없으면 앱이 뜨지 않는다.
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    get_k8s_service()
+    await get_user_job_repository().ensure_indexes()
+    try:
+        yield
+    finally:
+        await close_client()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 # MyApiError는 error_enum에 담긴 상태 코드로 구조화된 JSON 응답을 돌려준다.
