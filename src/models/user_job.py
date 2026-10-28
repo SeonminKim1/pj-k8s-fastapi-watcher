@@ -1,8 +1,13 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from src.models.k8s_names import EnvName, ImageRef
+
+# 유저 한 명이 가질 수 있는 삭제되지 않은 job 수(CLAUDE.md "유저별 job 개수 제한").
+MAX_JOBS_PER_USER = 10
 
 
 class JobStatus(StrEnum):
@@ -29,6 +34,44 @@ ALLOWED_STATUS_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     JobStatus.RUNNING: frozenset({JobStatus.FAILED}),
     JobStatus.FAILED: frozenset({JobStatus.RUNNING}),
 }
+
+
+class JobSize(StrEnum):
+    """컨테이너 크기 프리셋. 실제 cpu·memory 값은 매니페스트를 만들 때 정한다."""
+
+    SMALL = "small"
+    MEDIUM = "medium"
+
+
+class WebTemplate(BaseModel):
+    """web 타입 템플릿 입력: 상시 실행 서비스(Deployment + ClusterIP Service). 정의되지 않은 필드는 받지 않는다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["web"] = Field(description="job 타입. web")
+    image: ImageRef
+    port: int = Field(
+        ge=1,
+        le=65535,
+        strict=True,
+        description="컨테이너 포트 1~65535. Service port도 같은 값",
+    )
+    replicas: int = Field(
+        default=1, ge=1, le=2, strict=True, description="레플리카 수 1~2. 기본 1"
+    )
+    env: dict[EnvName, Annotated[str, Field(max_length=1024)]] = Field(
+        default_factory=dict,
+        max_length=20,
+        description="환경 변수(최대 20개, 값 1024자 이하). MongoDB에 평문으로 저장되므로 비밀값을 넣지 않는다",
+    )
+    size: JobSize = Field(
+        default=JobSize.SMALL,
+        description="크기 프리셋(requests = limits). small: cpu 100m / memory 128Mi, medium: cpu 250m / memory 256Mi. 기본 small",
+    )
+
+
+# type으로 구분하는 템플릿 입력. 타입을 추가하면 Union에 넣는다(예: WebTemplate | DbTemplate).
+JobTemplate = Annotated[WebTemplate, Field(discriminator="type")]
 
 
 class JobResource(BaseModel):
