@@ -22,6 +22,15 @@ def get_k8s_service() -> K8sService:
     return K8sService(client.ApiClient())
 
 
+# 앱 종료 시 만들어 둔 K8sService의 ApiClient(스레드 풀·커넥션 풀)를 닫고 캐시를 비운다.
+# 만든 적이 없으면 아무것도 하지 않는다(설정을 새로 읽지 않음).
+def close_k8s_service() -> None:
+    if get_k8s_service.cache_info().currsize == 0:
+        return
+    get_k8s_service().api_client.close()
+    get_k8s_service.cache_clear()
+
+
 def get_user_job_repository() -> UserJobRepository:
     return UserJobRepository(get_database()["user_jobs"])
 

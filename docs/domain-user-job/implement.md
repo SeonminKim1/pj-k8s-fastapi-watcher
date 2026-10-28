@@ -51,3 +51,4 @@
 
 ## 변경: 2026-10-28 코드 리뷰 반영
 - A(리뷰 1·2): Job 이름을 DNS-1123 label(63자)로 검사(Pod 라벨 `job-name` 값으로 복사되므로). `list_jobs`·`get_job`·`delete_job`도 `owner_id` 형식 오류면 `INVALID_PARAMETER`(`_require_user_id`). spec.md·모델 설명 갱신, 테스트 추가.
+- B(리뷰 3·7): lifespan의 시작 단계(`get_k8s_service()`, `ensure_indexes()`)를 `try` 안으로 옮겨, 시작 도중 실패해도 연결을 닫는다. 종료 시 `close_k8s_service()`로 K8s `ApiClient`(스레드 풀·커넥션 풀)도 닫고 캐시를 비운다. 테스트 3개 추가.

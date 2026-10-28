@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from kubernetes.config.config_exception import ConfigException
 
+from src import main
 from src.core import dependencies
 from src.main import app
 
@@ -25,3 +26,23 @@ def test_startup_fails_without_cluster_config(monkeypatch: pytest.MonkeyPatch) -
     with pytest.raises(ConfigException), TestClient(app):
         pass
     dependencies.get_k8s_service.cache_clear()
+
+
+# 시작 도중(인덱스 생성) 실패해도 MongoDB 연결과 K8s 클라이언트를 닫는다.
+def test_startup_failure_closes_clients(monkeypatch: pytest.MonkeyPatch) -> None:
+    closed: list[str] = []
+
+    class FailingRepository:
+        async def ensure_indexes(self) -> None:
+            raise RuntimeError("mongo down")
+
+    async def fake_close_client() -> None:
+        closed.append("mongo")
+
+    monkeypatch.setattr(main, "get_k8s_service", lambda: None)
+    monkeypatch.setattr(main, "get_user_job_repository", FailingRepository)
+    monkeypatch.setattr(main, "close_client", fake_close_client)
+    monkeypatch.setattr(main, "close_k8s_service", lambda: closed.append("k8s"))
+    with pytest.raises(RuntimeError), TestClient(app):
+        pass
+    assert closed == ["mongo", "k8s"]

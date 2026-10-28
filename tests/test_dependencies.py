@@ -51,3 +51,22 @@ def test_get_user_job_service_wiring() -> None:
     assert isinstance(service, UserJobService)
     assert isinstance(service.repository, UserJobRepository)
     assert service.repository.collection.name == "user_jobs"
+
+
+# close_k8s_service()는 만들어 둔 ApiClient를 닫고 캐시를 비운다. 다음 호출은 새로 만든다.
+def test_close_k8s_service(
+    config_calls: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = deps.get_k8s_service()
+    closed: list[bool] = []
+    monkeypatch.setattr(service.api_client, "close", lambda: closed.append(True))
+    deps.close_k8s_service()
+    assert closed == [True]
+    assert deps.get_k8s_service.cache_info().currsize == 0
+    assert deps.get_k8s_service() is not service
+
+
+# 만든 적이 없으면 설정을 읽지 않고 아무것도 하지 않는다.
+def test_close_k8s_service_without_service(config_calls: list[str]) -> None:
+    deps.close_k8s_service()
+    assert config_calls == []

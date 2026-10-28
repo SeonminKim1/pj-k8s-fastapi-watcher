@@ -69,7 +69,7 @@
   - `get_k8s_service()`: 처음 호출할 때 in-cluster 설정 → 실패하면 kubeconfig를 읽어 `ApiClient`를 만들고, 이후 같은 객체를 반환. import 시점에는 클러스터에 접근하지 않는다.
   - `get_user_job_repository()`, `get_user_job_service()`: `get_database()`로 조립
   - FastAPI 라우터는 `Depends(get_user_job_service)`로 받고, 테스트는 `app.dependency_overrides` 또는 생성자 인자로 가짜 객체를 넣는다.
-- 앱 시작(lifespan) 시 `get_k8s_service()`로 클러스터 설정을 먼저 읽고(설정이 없으면 앱 시작 실패), `ensure_indexes()`를 호출하고, 종료 시 `close_client()`로 MongoDB 연결을 닫는다.
+- 앱 시작(lifespan) 시 `get_k8s_service()`로 클러스터 설정을 먼저 읽고(설정이 없으면 앱 시작 실패), `ensure_indexes()`를 호출하고, 종료 시(시작 도중 실패 포함) `close_client()`로 MongoDB 연결을, `close_k8s_service()`로 K8s `ApiClient`를 닫는다.
 
 ## 에러 케이스
 `CLAUDE.md`의 "에러 상태 코드" 규칙대로 비즈니스 에러는 400/404, 서버 내부 오류는 500(전역 핸들러)이다.

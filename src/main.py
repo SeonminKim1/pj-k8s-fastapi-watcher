@@ -6,20 +6,26 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
 from src.core.db.mongodb import close_client
-from src.core.dependencies import get_k8s_service, get_user_job_repository
+from src.core.dependencies import (
+    close_k8s_service,
+    get_k8s_service,
+    get_user_job_repository,
+)
 from src.core.exception.my_exception import MyApiError
 
 
-# 앱 시작 시 클러스터 설정을 읽고 컬렉션 인덱스를 만든다(이미 있으면 그대로). 종료 시 MongoDB 연결을 닫는다.
+# 앱 시작 시 클러스터 설정을 읽고 컬렉션 인덱스를 만든다(이미 있으면 그대로).
 # 클러스터 설정(in-cluster·kubeconfig)이나 MongoDB가 없으면 앱이 뜨지 않는다.
+# 시작 도중 실패해도 이미 만든 연결(MongoDB, K8s ApiClient)은 finally에서 닫는다.
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    get_k8s_service()
-    await get_user_job_repository().ensure_indexes()
     try:
+        get_k8s_service()
+        await get_user_job_repository().ensure_indexes()
         yield
     finally:
         await close_client()
+        close_k8s_service()
 
 
 app = FastAPI(lifespan=lifespan)
