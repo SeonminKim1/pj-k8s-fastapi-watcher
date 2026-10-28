@@ -166,7 +166,7 @@
 - 작업 하나는 **반나절~1일 안에 끝나는 크기**로 나누고, `T<번호> [기능명] 작업 내용` 형식으로 씁니다.
 - 작업마다 **선행 작업**을 적고, 이를 바탕으로 **실행 흐름**(순차/병렬 단계)을 만듭니다. 병렬은 서로 의존이 없어 한 단계로 묶어 진행할 수 있다는 뜻입니다.
 - 기본 순서는 레이어 안쪽에서 바깥쪽입니다.
-- `CLAUDE.md`에 GitHub Project가 설정돼 있으면, 사용자가 작업 계획을 확인한 뒤 작업마다 이슈를 만들어 Project에 올립니다(아래 "GitHub Project 연동").
+- `CLAUDE.md`에 이슈 트래커가 설정돼 있으면, 사용자가 작업 계획을 확인한 뒤 작업마다 이슈를 만듭니다(아래 "이슈 트래커 연동").
 
 **Grill 체크리스트** (Claude가 점검)
 - 하루를 넘는 작업이 없는가?
@@ -191,42 +191,20 @@
 - [ ] T4 [<기능명>] service 로직 + service 테스트 — 선행: T2, T3
 - [ ] T5 [<기능명>] router 연결(컴포넌트는 lifespan 등록), 정상/에러 케이스 확인, 문서 갱신 — 선행: T4
 ```
-GitHub Project 연동 시 각 작업 끝에 이슈 번호를 붙입니다. 예: `- [ ] T1 [<기능명>] models/schemas 정의 — 선행: 없음 — #12`
+이슈 트래커 연동 시 각 작업 끝에 이슈 번호를 붙입니다. 예: `- [ ] T1 [<기능명>] models/schemas 정의 — 선행: 없음 — #12`
 
-### GitHub Project 연동 (`gh` CLI)
-`CLAUDE.md`의 "GitHub Project" 항목(owner, Project 번호)이 채워져 있을 때만 사용합니다. 비어 있으면 건너뛰고 그렇다고 알립니다.
+### 이슈 트래커 연동
+`CLAUDE.md`에 이슈 트래커(예: GitHub Project)가 설정돼 있을 때만 합니다. 비어 있으면 건너뛰고 그렇다고 알립니다. 여기에는 **언제·무엇을** 하는지만 적고, 트래커별 명령은 `/feat` 스킬 폴더에 둡니다(GitHub: `.claude/skills/feat/github.md`).
 
-**준비** (최초 1회, 사용자가 실행)
-- `gh` 설치 후 `gh auth login`, `gh auth refresh -s project` (Projects는 `project` 스코프가 필요)
-- 저장소에 GitHub remote가 연결돼 있어야 이슈를 만들 수 있습니다.
-- Project에 `Status` 필드(`Todo` / `In Progress` / `Done`)가 있어야 합니다(GitHub 기본 템플릿).
+| 시점 | 할 일 |
+|---|---|
+| TASK 확인 후 | 이슈가 없는 작업마다 이슈 생성(담당자 본인), 보드에 `Todo`로 추가, `task.md`에 이슈 번호 기록 |
+| 작업 시작(▶) | 상태 `In Progress` |
+| 작업 확인·커밋 후 | 상태 `Done`, 이슈 닫기(결과 한 줄 코멘트) |
+| IMPLEMENT 완료(리뷰 후) | 기능 브랜치를 push하고 PR 생성(담당자 본인, 보드에 추가). 머지는 사용자가 한다 |
+| 기존 기능 수정 | `task.md` 변경 섹션에서 새로 생긴 작업만 이슈 생성 |
 
-**ID 조회** (`/feat` 실행 중 처음 필요할 때 한 번, `<owner>`·`<number>`는 `CLAUDE.md` 값)
-```bash
-gh project view <number> --owner <owner> --format json --jq .id     # Project ID (PVT_...)
-gh project field-list <number> --owner <owner> --format json \
-  --jq '.fields[] | select(.name=="Status") | {id, options}'          # Status 필드 ID와 옵션 ID
-```
-
-**TASK: 이슈 생성** (사용자가 작업 계획을 확인한 뒤, 이슈가 없는 작업만)
-```bash
-gh issue create --title "T1 [<feature-name>] <작업 내용>" --assignee @me \
-  --body "선행: <없음|#번호>"$'\n\n'"문서: docs/<feature-name>/task.md"   # 출력: 이슈 URL
-gh project item-add <number> --owner <owner> --url <이슈 URL> --format json --jq .id   # 아이템 ID
-```
-- 담당자는 `--assignee @me`로 `gh`에 로그인한 사용자 본인으로 지정합니다.
-- 생성 후 `task.md`의 해당 작업 끝에 `— #<이슈 번호>`를 붙입니다.
-- 아이템 ID는 저장하지 않습니다. 필요할 때 `item-add`를 다시 실행하면 기존 아이템 ID가 그대로 반환됩니다.
-
-**IMPLEMENT: 상태 변경**
-```bash
-gh project item-edit --id <아이템 ID> --project-id <Project ID> \
-  --field-id <Status 필드 ID> --single-select-option-id <옵션 ID>
-gh issue close <이슈 번호> --comment "<바뀐 파일, 테스트 결과 한 줄>"
-```
-- 작업 시작(▶) 시 `In Progress`, 완료(✔) 시 `Done`으로 바꾸고 이슈를 닫습니다.
-- `gh` 명령이 실패해도 구현은 멈추지 않습니다. 실패 내용을 보고하고 `implement.md`의 `## 메모`에 남깁니다.
-- 기존 기능 수정으로 `task.md`에 `## 변경:` 섹션이 추가되면, 새로 생긴 작업만 이슈로 만듭니다.
+- 트래커 명령이 실패해도 구현은 멈추지 않습니다. 실패 내용을 보고하고 `implement.md`의 `## 메모`에 남깁니다.
 
 ## 5. IMPLEMENT — 구현과 확인
 - **브랜치**: `main` ➔ `feature/<feature-name>`으로 작업하고, 끝나면 `main`에 머지합니다.
@@ -236,6 +214,7 @@ gh issue close <이슈 번호> --comment "<바뀐 파일, 테스트 결과 한 �
   - 그 작업의 코드·테스트와, 작업 중 고친 `spec.md`·`implement.md`를 함께 넣습니다. `task.md` 체크는 마지막 작업 커밋에서 합니다.
   - 커밋 전에 `uv run ruff check .`, `uv run pytest`가 통과해야 합니다.
 - **리뷰**: 리뷰어가 없으므로 머지 전에 Claude Code의 `/code-review`로 셀프 리뷰를 합니다.
+- **PR·머지**: 리뷰 반영 후 PR을 만들고(이슈 트래커 연동 시), 머지는 사용자가 합니다. 작업별 커밋이 남도록 일반 머지를 씁니다(squash 금지).
 
 **진행 보고**: 개발 흐름을 따라갈 수 있도록 `task.md`의 실행 흐름 단계마다 짧게 보고합니다.
 - 단계 시작: `▶ 2단계 (병렬) T2, T3 시작 — <무엇을 왜 하는지 한 줄>`

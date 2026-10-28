@@ -12,9 +12,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `src/core/dependencies.py`: service·repository·`K8sService` 조립. `main.py` lifespan에서 클러스터 설정 로딩(`get_k8s_service()`)과 repository `ensure_indexes()`를 하므로, 앱을 띄우려면 클러스터 설정(in-cluster 또는 kubeconfig)과 MongoDB가 모두 필요하다(없으면 시작 실패).
 - `src/services/k8s_service.py`: `K8sService` 래퍼. 클러스터 접근은 반드시 이 클래스를 거친다. 다른 클래스는 직접 만들지 않고 생성자로 주입받는다(주입 방식은 아래 "의존성 주입").
 - `src/main.py`: `PyMongoError`는 500 `db_error`로 처리한다.
-- GitHub Project (`/feat` TASK·IMPLEMENT에서 `gh`로 이슈·상태 관리, 비어 있으면 연동 안 함)
+- 이슈 트래커: GitHub Project (`/feat`가 `.claude/skills/feat/github.md`의 `gh` 명령으로 이슈·상태·PR 관리, 비어 있으면 연동 안 함)
   - owner: `SeonminKim1`
-  - Project 번호: `3` (https://github.com/users/SeonminKim1/projects/3, 저장소 `SeonminKim1/pj-k8s-fastapi-watcher`에 연결됨)
+  - Project 번호: `3`, 제목: `pj-k8s-fastapi-watcher` (https://github.com/users/SeonminKim1/projects/3, 저장소 `SeonminKim1/pj-k8s-fastapi-watcher`에 연결됨)
 
 ## 프로젝트 상세 설명 (요구사항)
 - HTTP API 기능은 `docs/api-*`, watch 같은 백그라운드 기능은 `docs/component-*`, API·컴포넌트 없이 도메인 모델만 정의하는 기능은 `docs/domain-*` 폴더로 문서화한다.
