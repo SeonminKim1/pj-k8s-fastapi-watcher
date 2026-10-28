@@ -3,14 +3,22 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
+from src.models.k8s_names import is_dns_1035_label, is_user_id
 from src.models.user_job import (
     ALLOWED_RESOURCE_KINDS,
     ALLOWED_STATUS_TRANSITIONS,
+    MAX_JOBS_PER_USER,
     JobResource,
     JobStatus,
+    JobTemplate,
     UserJob,
 )
-from src.repository.user_job_repository import DuplicateJobNameError, UserJobRepository
+from src.repository.user_job_repository import (
+    DuplicateJobNameError,
+    JobQuotaExceededError,
+    UserJobRepository,
+)
+from src.services.job_templates import build_resources
 
 # 유저 ID: 소문자·숫자·'-', 영숫자로 시작·끝, 1~58자(네임스페이스 user-{id}가 63자를 넘지 않도록)
 _USER_ID_RE = re.compile(r"^[a-z0-9]([-a-z0-9]{0,56}[a-z0-9])?$")
@@ -60,10 +68,10 @@ def _is_valid_resource_name(kind: str, name: Any) -> bool:
     return _is_dns_subdomain(name)
 
 
-# 유저 ID 형식이 틀리면 INVALID_PARAMETER(400). owner_id를 받는 모든 메서드의 첫 검사다.
+# 유저 ID 형식이 틀리면 INVALID_USER_ID(400). owner_id를 받는 모든 메서드의 첫 검사다.
 def _require_user_id(owner_id: Any) -> None:
-    if not _is_user_id(owner_id):
-        raise MyApiError(ErrorEnum.INVALID_PARAMETER)
+    if not is_user_id(owner_id):
+        raise MyApiError(ErrorEnum.INVALID_USER_ID)
 
 
 # 매니페스트 목록을 검증해 JobResource로 바꾼다. namespace는 job 네임스페이스로 채운다.
@@ -110,20 +118,23 @@ class UserJobService:
     def __init__(self, repository: UserJobRepository) -> None:
         self.repository = repository
 
-    # 입력을 검증하고 pending 상태의 job을 저장한다. 클러스터 반영은 operator가 한다.
+    # 템플릿으로 매니페스트를 만들어 pending 상태의 job을 저장한다. 클러스터 반영은 operator가 한다.
+    # owner_id·name은 schema를 거치지 않는 호출자를 위해 다시 검사한다. template은 이미 검증된 모델이다.
+    # 검사 순서: 형식 → 개수 한도(JOB_QUOTA_EXCEEDED) → 이름 중복(JOB_NAME_DUPLICATED). 한도·중복은 저장 시 인덱스로 판단한다.
     async def create_job(
-        self, owner_id: str, name: str, manifests: list[dict[str, Any]]
+        self, owner_id: str, name: str, template: JobTemplate
     ) -> UserJob:
         _require_user_id(owner_id)
-        if not _is_dns_label(name):
-            raise MyApiError(ErrorEnum.INVALID_PARAMETER)
+        if not is_dns_1035_label(name):
+            raise MyApiError(ErrorEnum.INVALID_JOB_NAME)
         namespace = f"user-{owner_id}"
-        resources = _build_resources(manifests, namespace)
+        resources = build_resources(name, namespace, template)
         now = datetime.now(UTC)
         job_doc = {
             "owner_id": owner_id,
             "namespace": namespace,
             "name": name,
+            "template": template.model_dump(mode="json"),
             "resources": [r.model_dump() for r in resources],
             "status": JobStatus.PENDING.value,
             "is_deleted": False,
@@ -132,7 +143,9 @@ class UserJobService:
             "deleted_at": None,
         }
         try:
-            return await self.repository.insert(job_doc)
+            return await self.repository.insert_with_slot(job_doc, MAX_JOBS_PER_USER)
+        except JobQuotaExceededError as e:
+            raise MyApiError(ErrorEnum.JOB_QUOTA_EXCEEDED) from e
         except DuplicateJobNameError as e:
             raise MyApiError(ErrorEnum.JOB_NAME_DUPLICATED) from e
 
@@ -141,7 +154,7 @@ class UserJobService:
         _require_user_id(owner_id)
         return await self.repository.find_active_by_owner(owner_id)
 
-    # 자기 job 하나를 반환한다. 유저 ID 형식 오류는 INVALID_PARAMETER, 남의 job·없음·삭제됨·잘못된 ID는 모두 JOB_NOT_FOUND.
+    # 자기 job 하나를 반환한다. 유저 ID 형식 오류는 INVALID_USER_ID, 남의 job·없음·삭제됨·잘못된 ID는 모두 JOB_NOT_FOUND.
     async def get_job(self, owner_id: str, job_id: str) -> UserJob:
         _require_user_id(owner_id)
         job = await self.repository.find_active_by_id(job_id)

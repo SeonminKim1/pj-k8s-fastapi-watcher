@@ -79,11 +79,9 @@ class JobResource(BaseModel):
 
     api_version: str = Field(description="매니페스트의 apiVersion. 예: apps/v1")
     kind: str = Field(description="매니페스트의 kind. ALLOWED_RESOURCE_KINDS 중 하나")
-    name: str = Field(
-        description="매니페스트의 metadata.name. Service는 DNS-1035 label(1~63자), Job은 DNS-1123 label(1~63자), 나머지는 DNS-1123 subdomain(1~253자)"
-    )
+    name: str = Field(description="매니페스트의 metadata.name. web 템플릿은 job 이름")
     manifest: dict[str, Any] = Field(
-        description="operator가 server-side apply할 매니페스트 원본. metadata.namespace는 job 네임스페이스로 채워진다"
+        description="operator가 server-side apply할 매니페스트. 템플릿으로 서버가 생성한다"
     )
 
 
@@ -98,10 +96,16 @@ class UserJob(BaseModel):
         description="소유자 네임스페이스 user-{owner_id}. 생성 시 서버가 정한다"
     )
     name: str = Field(
-        description="유저가 정하는 job 이름. DNS-1123 label(1~63자), 삭제되지 않은 job끼리 유저별 유일"
+        description="유저가 정하는 job 이름. DNS-1035 label(영문 소문자로 시작, 1~63자), 삭제되지 않은 job끼리 유저별 유일. 생성되는 리소스 이름으로 쓰인다"
+    )
+    template: JobTemplate = Field(
+        description="유저가 보낸 템플릿 입력(기본값이 채워진 상태)"
     )
     resources: list[JobResource] = Field(
-        description="구성 리소스. 1개 이상, 모두 namespace에 속한다"
+        description="템플릿으로 서버가 생성한 리소스. 1개 이상, 모두 namespace에 속한다"
+    )
+    quota_slot: int = Field(
+        description="개수 한도용 슬롯 번호 0~MAX_JOBS_PER_USER-1. 저장 시 서버가 빈 슬롯을 고른다"
     )
     status: JobStatus = Field(
         description="operator가 클러스터를 관찰해 갱신하는 상태. 생성 시 pending"

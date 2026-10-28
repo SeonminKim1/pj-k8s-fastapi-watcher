@@ -8,6 +8,9 @@
 - ▶ 2단계 (병렬) T3, T4 시작 — web 템플릿 매니페스트 생성, repository 슬롯 저장
 - ✔ T3 완료 — `src/services/job_templates.py`(`build_resources`, `SIZE_PRESETS`, `KINDS_BY_TYPE`), `tests/test_job_templates.py`. pytest 185 passed (#10)
 - ✔ T4 완료 — `src/repository/user_job_repository.py`에 `insert_with_slot`·`JobQuotaExceededError`·`uniq_owner_slot` 인덱스 추가. 로컬 MongoDB 9.0.2 임시 DB에서 9개 항목 확인 후 DB 삭제(아래 메모). pytest 185 passed (#11)
+- ■ 2단계 완료 — 다음: 3단계 T5
+- ▶ 3단계 (순차) T5 시작 — UserJob·create_job을 템플릿 입력·개수 한도로 변경
+- ✔ T5 완료 — `src/models/user_job.py`(`template`·`quota_slot`), `src/services/user_job_service.py`(`create_job(owner_id, name, template)`, `INVALID_USER_ID`·`INVALID_JOB_NAME`·`JOB_QUOTA_EXCEEDED`), `tests/test_user_job_service.py`(가짜 repository 슬롯 규칙, 매니페스트 검증 테스트 제거, 한도 테스트 추가). pytest 175 passed (#12)
 
 ## spec과 달라진 점
 - 없음

@@ -5,8 +5,11 @@ from typing import Any
 import pytest
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
-from src.models.user_job import JobStatus, UserJob
-from src.repository.user_job_repository import DuplicateJobNameError
+from src.models.user_job import MAX_JOBS_PER_USER, JobStatus, UserJob, WebTemplate
+from src.repository.user_job_repository import (
+    DuplicateJobNameError,
+    JobQuotaExceededError,
+)
 from src.services.user_job_service import UserJobService
 
 
@@ -19,18 +22,28 @@ class FakeUserJobRepository:
         # 조건부 갱신 직전에 다른 갱신이 끼어드는 상황을 만들 때 쓴다.
         self.interfere_once: JobStatus | None = None
         self.update_calls = 0
+        self.max_slots_seen: int | None = None
 
-    async def insert(self, job_doc: dict[str, Any]) -> UserJob:
-        for d in self.docs.values():
-            if not d["is_deleted"] and (d["owner_id"], d["name"]) == (
-                job_doc["owner_id"],
-                job_doc["name"],
-            ):
-                raise DuplicateJobNameError
+    # 실제 repository처럼 빈 슬롯이 없으면 한도 초과, 그다음 이름 중복을 판단한다.
+    async def insert_with_slot(
+        self, job_doc: dict[str, Any], max_slots: int
+    ) -> UserJob:
+        self.max_slots_seen = max_slots
+        active = [
+            d
+            for d in self.docs.values()
+            if d["owner_id"] == job_doc["owner_id"] and not d["is_deleted"]
+        ]
+        used = {d["quota_slot"] for d in active}
+        slot = next((i for i in range(max_slots) if i not in used), None)
+        if slot is None:
+            raise JobQuotaExceededError
+        if any(d["name"] == job_doc["name"] for d in active):
+            raise DuplicateJobNameError
         self._seq += 1
         job_id = f"{self._seq:024x}"
-        self.docs[job_id] = dict(job_doc)
-        return UserJob(id=job_id, **job_doc)
+        self.docs[job_id] = {**job_doc, "quota_slot": slot}
+        return UserJob(id=job_id, **self.docs[job_id])
 
     async def find_active_by_owner(self, owner_id: str) -> list[UserJob]:
         jobs = [
@@ -73,18 +86,9 @@ class FakeUserJobRepository:
         return True
 
 
-def manifest(
-    kind: str = "Deployment",
-    name: str = "web",
-    api_version: str = "apps/v1",
-    **meta: Any,
-) -> dict:
-    return {
-        "apiVersion": api_version,
-        "kind": kind,
-        "metadata": {"name": name, **meta},
-        "spec": {},
-    }
+# 필수 필드만 채운 web 템플릿. 나머지는 인자로 덮어쓴다.
+def web(**fields: Any) -> WebTemplate:
+    return WebTemplate(**{"type": "web", "image": "nginx:1.27", "port": 80, **fields})
 
 
 @pytest.fixture
@@ -106,117 +110,75 @@ def assert_error(
 # --- create_job ---
 
 
-# 정상 생성: pending, 유저 네임스페이스, 매니페스트에 namespace 채움, 조회용 필드 추출
+# 정상 생성: pending, 유저 네임스페이스, 템플릿 저장(기본값 포함), 템플릿으로 만든 리소스
 async def test_create_job(service: UserJobService) -> None:
-    job = await service.create_job(
-        "alice", "my-app", [manifest(), manifest("Service", "web", "v1")]
-    )
+    job = await service.create_job("alice", "my-app", web(replicas=2))
     assert job.status is JobStatus.PENDING
     assert job.namespace == "user-alice"
+    assert job.name == "my-app"
     assert job.is_deleted is False and job.deleted_at is None
     assert job.created_at == job.updated_at and job.created_at.tzinfo is not None
+    assert job.template == web(replicas=2, env={}, size="small")
     assert [(r.kind, r.name) for r in job.resources] == [
-        ("Deployment", "web"),
-        ("Service", "web"),
+        ("Deployment", "my-app"),
+        ("Service", "my-app"),
     ]
     assert all(
         r.manifest["metadata"]["namespace"] == "user-alice" for r in job.resources
     )
+    deployment = job.resources[0].manifest
+    assert deployment["spec"]["replicas"] == 2
 
 
-# 매니페스트에 job 네임스페이스와 같은 namespace가 있으면 허용
-async def test_create_job_same_namespace_ok(service: UserJobService) -> None:
-    job = await service.create_job(
-        "alice", "my-app", [manifest(namespace="user-alice")]
-    )
-    assert job.resources[0].manifest["metadata"]["namespace"] == "user-alice"
+# 템플릿은 JSON으로 저장된다(enum이 아닌 문자열). MongoDB에 그대로 넣을 수 있는 형태.
+async def test_create_job_stores_template_as_json(
+    service: UserJobService, repo: FakeUserJobRepository
+) -> None:
+    job = await service.create_job("alice", "my-app", web(size="medium"))
+    stored = repo.docs[job.id]["template"]
+    assert stored == {
+        "type": "web",
+        "image": "nginx:1.27",
+        "port": 80,
+        "replicas": 1,
+        "env": {},
+        "size": "medium",
+    }
+    assert type(stored["size"]) is str
 
 
 @pytest.mark.parametrize("owner_id", ["", "Alice", "-alice", "alice_1", "a" * 59, None])
 async def test_create_job_invalid_owner(service: UserJobService, owner_id: Any) -> None:
     with pytest.raises(MyApiError) as e:
-        await service.create_job(owner_id, "my-app", [manifest()])
-    assert_error(e, ErrorEnum.INVALID_PARAMETER)
+        await service.create_job(owner_id, "my-app", web())
+    assert_error(e, ErrorEnum.INVALID_USER_ID)
 
 
 async def test_create_job_owner_id_max_length_ok(service: UserJobService) -> None:
-    job = await service.create_job("a" * 58, "my-app", [manifest()])
+    job = await service.create_job("a" * 58, "my-app", web())
     assert len(job.namespace) == 63
 
 
-@pytest.mark.parametrize("name", ["", "My-App", "app-", "a" * 64, "my.app"])
+# job 이름은 DNS-1035 label: 숫자 시작·대문자·끝 '-'·64자·점은 거부
+@pytest.mark.parametrize("name", ["", "1app", "My-App", "app-", "a" * 64, "my.app"])
 async def test_create_job_invalid_name(service: UserJobService, name: str) -> None:
     with pytest.raises(MyApiError) as e:
-        await service.create_job("alice", name, [manifest()])
-    assert_error(e, ErrorEnum.INVALID_PARAMETER)
+        await service.create_job("alice", name, web())
+    assert_error(e, ErrorEnum.INVALID_JOB_NAME)
 
 
-@pytest.mark.parametrize(
-    "manifests",
-    [
-        [],  # 리소스 없음
-        [manifest("Secret", "s", "v1")],  # 허용 목록 밖(Secret 제외)
-        [manifest("Deployment", "web", "v1")],  # apiVersion 불일치
-        [manifest(name="Web")],  # 이름 형식 오류
-        [{"apiVersion": "apps/v1", "kind": "Deployment"}],  # metadata 없음
-        [
-            {"apiVersion": {}, "kind": "Deployment", "metadata": {"name": "web"}}
-        ],  # 문자열 아닌 apiVersion
-        ["not-a-dict"],  # 매니페스트가 dict 아님
-        [manifest(namespace="other")],  # 다른 네임스페이스
-        [manifest(), manifest()],  # (kind, name) 중복
-    ],
-)
-async def test_create_job_invalid_resource(
-    service: UserJobService, manifests: list
-) -> None:
-    with pytest.raises(MyApiError) as e:
-        await service.create_job("alice", "my-app", manifests)
-    assert_error(e, ErrorEnum.INVALID_JOB_RESOURCE)
-
-
-# Service 이름은 DNS-1035 label: 숫자로 시작·점 포함·64자 이상은 거부
-@pytest.mark.parametrize("name", ["1web", "web.v1", "a" * 64])
-async def test_create_job_invalid_service_name(
-    service: UserJobService, name: str
-) -> None:
-    with pytest.raises(MyApiError) as e:
-        await service.create_job("alice", "my-app", [manifest("Service", name, "v1")])
-    assert_error(e, ErrorEnum.INVALID_JOB_RESOURCE)
-
-
-# Service가 아닌 리소스는 DNS-1123 subdomain: 숫자 시작·점 포함 허용
-async def test_create_job_subdomain_name_ok(service: UserJobService) -> None:
-    job = await service.create_job(
-        "alice",
-        "my-app",
-        [manifest(name="1web.v1"), manifest("ConfigMap", "a" * 64, "v1")],
-    )
-    assert [r.name for r in job.resources] == ["1web.v1", "a" * 64]
-
-
-# Job 이름은 DNS-1123 label: 64자 이상·점 포함은 거부, 63자는 허용
-@pytest.mark.parametrize("name", ["a" * 64, "a.b"])
-async def test_create_job_invalid_job_name(service: UserJobService, name: str) -> None:
-    with pytest.raises(MyApiError) as e:
-        await service.create_job("alice", "my-app", [manifest("Job", name, "batch/v1")])
-    assert_error(e, ErrorEnum.INVALID_JOB_RESOURCE)
-
-
-async def test_create_job_job_name_max_length_ok(service: UserJobService) -> None:
-    job = await service.create_job(
-        "alice", "my-app", [manifest("Job", "a" * 63, "batch/v1")]
-    )
+async def test_create_job_name_max_length_ok(service: UserJobService) -> None:
+    job = await service.create_job("alice", "a" * 63, web())
     assert job.resources[0].name == "a" * 63
 
 
-# owner_id를 받는 조회·삭제도 유저 ID 형식이 틀리면 INVALID_PARAMETER(400)
+# owner_id를 받는 조회·삭제도 유저 ID 형식이 틀리면 INVALID_USER_ID(400)
 @pytest.mark.parametrize("method", ["list", "get", "delete"])
 @pytest.mark.parametrize("owner_id", ["", "Bad_User!"])
 async def test_invalid_owner_id_on_read_delete(
     service: UserJobService, method: str, owner_id: str
 ) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     calls = {
         "list": lambda: service.list_jobs(owner_id),
         "get": lambda: service.get_job(owner_id, job.id),
@@ -224,41 +186,80 @@ async def test_invalid_owner_id_on_read_delete(
     }
     with pytest.raises(MyApiError) as e:
         await calls[method]()
-    assert_error(e, ErrorEnum.INVALID_PARAMETER)
-
-
-# 같은 이름이라도 kind가 다르면 허용
-async def test_create_job_same_name_different_kind_ok(service: UserJobService) -> None:
-    job = await service.create_job(
-        "alice", "my-app", [manifest(), manifest("Service", "web", "v1")]
-    )
-    assert len(job.resources) == 2
+    assert_error(e, ErrorEnum.INVALID_USER_ID)
 
 
 async def test_create_job_duplicated_name(service: UserJobService) -> None:
-    await service.create_job("alice", "my-app", [manifest()])
+    await service.create_job("alice", "my-app", web())
     with pytest.raises(MyApiError) as e:
-        await service.create_job("alice", "my-app", [manifest()])
+        await service.create_job("alice", "my-app", web())
     assert_error(e, ErrorEnum.JOB_NAME_DUPLICATED)
 
 
 # 다른 유저는 같은 이름 가능, 삭제된 job의 이름은 재사용 가능
 async def test_create_job_name_reuse(service: UserJobService) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
-    await service.create_job("bob", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
+    await service.create_job("bob", "my-app", web())
     await service.delete_job("alice", job.id)
-    again = await service.create_job("alice", "my-app", [manifest()])
+    again = await service.create_job("alice", "my-app", web())
     assert again.id != job.id
+
+
+# --- 개수 한도 ---
+
+
+# service가 한도 값(MAX_JOBS_PER_USER)을 repository에 넘긴다
+async def test_quota_limit_passed_to_repository(
+    service: UserJobService, repo: FakeUserJobRepository
+) -> None:
+    await service.create_job("alice", "my-app", web())
+    assert repo.max_slots_seen == MAX_JOBS_PER_USER == 10
+
+
+# 10개까지 성공, 11번째는 JOB_QUOTA_EXCEEDED
+async def test_quota_exceeded(service: UserJobService) -> None:
+    for i in range(MAX_JOBS_PER_USER):
+        await service.create_job("alice", f"job{i}", web())
+    with pytest.raises(MyApiError) as e:
+        await service.create_job("alice", "one-more", web())
+    assert_error(e, ErrorEnum.JOB_QUOTA_EXCEEDED)
+
+
+# 한도가 꽉 찬 유저가 중복 이름을 보내면 한도 초과가 먼저(spec 검사 순서)
+async def test_quota_checked_before_duplicated_name(service: UserJobService) -> None:
+    for i in range(MAX_JOBS_PER_USER):
+        await service.create_job("alice", f"job{i}", web())
+    with pytest.raises(MyApiError) as e:
+        await service.create_job("alice", "job0", web())
+    assert_error(e, ErrorEnum.JOB_QUOTA_EXCEEDED)
+
+
+# 삭제하면 개수에서 빠져 다시 만들 수 있다
+async def test_quota_freed_by_delete(service: UserJobService) -> None:
+    jobs = [
+        await service.create_job("alice", f"job{i}", web())
+        for i in range(MAX_JOBS_PER_USER)
+    ]
+    await service.delete_job("alice", jobs[3].id)
+    job = await service.create_job("alice", "one-more", web())
+    assert job.quota_slot == jobs[3].quota_slot
+
+
+# 한도는 유저별이다
+async def test_quota_per_user(service: UserJobService) -> None:
+    for i in range(MAX_JOBS_PER_USER):
+        await service.create_job("alice", f"job{i}", web())
+    assert await service.create_job("bob", "job0", web())
 
 
 # --- list_jobs / get_job ---
 
 
 async def test_list_jobs_own_active_latest_first(service: UserJobService) -> None:
-    first = await service.create_job("alice", "first", [manifest()])
-    second = await service.create_job("alice", "second", [manifest()])
-    deleted = await service.create_job("alice", "deleted", [manifest()])
-    await service.create_job("bob", "other", [manifest()])
+    first = await service.create_job("alice", "first", web())
+    second = await service.create_job("alice", "second", web())
+    deleted = await service.create_job("alice", "deleted", web())
+    await service.create_job("bob", "other", web())
     await service.delete_job("alice", deleted.id)
     assert [j.id for j in await service.list_jobs("alice")] == [second.id, first.id]
 
@@ -268,14 +269,14 @@ async def test_list_jobs_empty(service: UserJobService) -> None:
 
 
 async def test_get_job(service: UserJobService) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     assert (await service.get_job("alice", job.id)).id == job.id
 
 
 # 남의 job·없음·삭제됨·잘못된 ID는 모두 JOB_NOT_FOUND
 @pytest.mark.parametrize("case", ["other_owner", "missing", "deleted", "invalid_id"])
 async def test_get_job_not_found(service: UserJobService, case: str) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     owner, job_id = "alice", job.id
     if case == "other_owner":
         owner = "bob"
@@ -305,7 +306,7 @@ async def test_get_job_not_found(service: UserJobService, case: str) -> None:
 async def test_update_status_allowed(
     service: UserJobService, path: list[JobStatus]
 ) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     for status in path:
         job = await service.update_job_status(job.id, status)
     assert job.status is path[-1]
@@ -314,7 +315,7 @@ async def test_update_status_allowed(
 
 # 같은 상태로의 갱신은 변경 없이 성공(멱등)
 async def test_update_status_same_is_noop(service: UserJobService) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     same = await service.update_job_status(job.id, JobStatus.PENDING)
     assert same.status is JobStatus.PENDING and same.updated_at == job.updated_at
 
@@ -323,7 +324,7 @@ async def test_update_status_same_is_noop(service: UserJobService) -> None:
 async def test_update_status_back_to_pending_rejected(
     service: UserJobService, current: JobStatus
 ) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     await service.update_job_status(job.id, current)
     with pytest.raises(MyApiError) as e:
         await service.update_job_status(job.id, JobStatus.PENDING)
@@ -332,7 +333,7 @@ async def test_update_status_back_to_pending_rejected(
 
 @pytest.mark.parametrize("case", ["missing", "deleted", "invalid_id"])
 async def test_update_status_not_found(service: UserJobService, case: str) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     job_id = {"missing": "f" * 24, "invalid_id": "not-an-id"}.get(case, job.id)
     if case == "deleted":
         await service.delete_job("alice", job.id)
@@ -345,7 +346,7 @@ async def test_update_status_not_found(service: UserJobService, case: str) -> No
 async def test_update_status_concurrent_same_target(
     service: UserJobService, repo: FakeUserJobRepository
 ) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     repo.interfere_once = JobStatus.RUNNING
     result = await service.update_job_status(job.id, JobStatus.RUNNING)
     assert result.status is JobStatus.RUNNING
@@ -356,7 +357,7 @@ async def test_update_status_concurrent_same_target(
 async def test_update_status_concurrent_other_source(
     service: UserJobService, repo: FakeUserJobRepository
 ) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     repo.interfere_once = JobStatus.FAILED
     result = await service.update_job_status(job.id, JobStatus.RUNNING)
     assert result.status is JobStatus.RUNNING
@@ -370,7 +371,7 @@ async def test_update_status_concurrent_other_source(
 async def test_update_status_single_write(
     service: UserJobService, repo: FakeUserJobRepository, target: JobStatus
 ) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     await service.update_job_status(job.id, JobStatus.FAILED)
     repo.update_calls = 0
     try:
@@ -384,7 +385,7 @@ async def test_update_status_single_write(
 
 
 async def test_delete_job(service: UserJobService, repo: FakeUserJobRepository) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     await service.delete_job("alice", job.id)
     doc = repo.docs[job.id]
     assert doc["is_deleted"] is True and doc["deleted_at"] is not None
@@ -395,7 +396,7 @@ async def test_delete_job(service: UserJobService, repo: FakeUserJobRepository) 
     "case", ["other_owner", "missing", "already_deleted", "invalid_id"]
 )
 async def test_delete_job_not_found(service: UserJobService, case: str) -> None:
-    job = await service.create_job("alice", "my-app", [manifest()])
+    job = await service.create_job("alice", "my-app", web())
     owner, job_id = "alice", job.id
     if case == "other_owner":
         owner = "bob"
