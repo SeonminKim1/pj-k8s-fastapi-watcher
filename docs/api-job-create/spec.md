@@ -55,6 +55,7 @@
 
 - `owner_id`, `is_deleted`, `deleted_at`, 매니페스트 본문은 응답하지 않는다. 필드는 나중에 추가할 수 있지만 빼기는 어려우므로 최소로 시작한다.
 - 에러 응답은 기존과 같은 `{code, message}`.
+- `/docs`(OpenAPI)에는 실제로 돌려주는 `201`·`400`·`500`만 문서화한다. 검증 에러를 400으로 바꿔 응답하므로 FastAPI가 자동으로 넣는 `422`는 문서에서 뺀다.
 
 ## 생성되는 매니페스트 (`web`)
 `docs/domain-user-job/spec.md`의 "템플릿 → 매니페스트"를 따른다. 요약: Deployment 1개 + Service 1개(ClusterIP), 이름은 job 이름, 리소스·보안 설정·readinessProbe는 서버 고정.

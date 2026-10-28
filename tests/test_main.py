@@ -15,6 +15,22 @@ def test_openapi_docs() -> None:
     assert response.status_code == 200
 
 
+# 검증 에러는 400으로 바꿔 응답하므로 OpenAPI에 422와 그 스키마가 없어야 한다(/docs가 실제 응답과 같게).
+def test_openapi_has_no_422() -> None:
+    schema = client.get("/openapi.json").json()
+    for path, path_item in schema["paths"].items():
+        for method, operation in path_item.items():
+            assert "422" not in operation["responses"], (method, path)
+    schemas = schema["components"]["schemas"]
+    assert "HTTPValidationError" not in schemas
+    assert "ValidationError" not in schemas
+    # 문서화된 400 응답은 실제 에러 모양({code, message})
+    bad_request = schema["paths"]["/jobs"]["post"]["responses"]["400"]
+    assert bad_request["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
+
+
 # 클러스터 설정(in-cluster·kubeconfig)이 모두 없으면 앱 시작이 실패한다. MongoDB보다 먼저 확인하므로 DB 없이 검증된다.
 def test_startup_fails_without_cluster_config(monkeypatch: pytest.MonkeyPatch) -> None:
     def no_config() -> None:

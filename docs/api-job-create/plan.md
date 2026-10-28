@@ -70,3 +70,8 @@
 - **기존 동작 변경**: `create_job` 시그니처, `INVALID_PARAMETER` → `INVALID_USER_ID`(owner_id 형식), `INVALID_JOB_RESOURCE` 제거, job 이름 규칙 DNS-1123 → DNS-1035. 아직 API·operator가 없어 외부 영향은 없고, 기존 service 테스트를 함께 고친다.
 - **pydantic 에러 `loc` 형태 의존**: 매핑이 `("body", "template", "web", ...)` 같은 형태에 기대므로 pydantic·FastAPI 버전이 오르면 깨질 수 있다. router 테스트가 에러 표 행마다 `code`를 확인해 깨지면 바로 드러나게 한다.
 - **`X-User-Id` 헤더 이름**: FastAPI는 `loc`에 소문자 `x-user-id`로 넣는다(대소문자 무관 매칭).
+
+## 변경: 2026-10-28 /docs 422 제거
+- `src/main.py`: `app.openapi`를 감싸, FastAPI 기본 OpenAPI를 만든 뒤 모든 경로의 `422` 응답과 `HTTPValidationError`·`ValidationError` 스키마를 뺀다. 한 번 만든 결과는 FastAPI처럼 `app.openapi_schema`에 캐시한다. 이후 추가되는 엔드포인트에도 그대로 적용된다.
+- `tests/test_main.py`: OpenAPI 전체에 `422`와 두 스키마가 없는지, `POST /jobs`의 400 응답이 `ErrorResponse`인지 확인.
+- 대안: 엔드포인트마다 `responses={422: ...}`를 지정하는 방법은 FastAPI가 422를 계속 추가하므로 뺄 수 없어 쓰지 않는다.

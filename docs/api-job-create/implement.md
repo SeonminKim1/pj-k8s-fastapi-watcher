@@ -17,9 +17,12 @@
 - ■ 4단계 완료 — 다음: 5단계 T7
 - ▶ 5단계 (순차) T7 시작 — schema·`POST /jobs` router·검증 에러 핸들러 연결
 - ✔ T7 완료 — `src/schemas/job.py`, `src/schemas/error.py`, `src/routers/job_router.py`, `src/main.py`(라우터 등록, `RequestValidationError` → 400 핸들러), `tests/test_job_router.py`. pytest 205 passed (#14)
+- ■ 5단계 완료 — 다음: 6단계 T8(작업 확인 중 추가)
+- ▶ 6단계 (순차) T8 시작 — `/docs`에서 실제로 쓰지 않는 422 제거(task·plan·spec에 변경 반영)
+- ✔ T8 완료 — `src/main.py`(`_openapi_without_422`), `tests/test_main.py`(`test_openapi_has_no_422`). pytest 206 passed (#16)
 
 ## spec과 달라진 점
-- 없음
+- T7 작업 확인 중 `/docs`에 실제로 쓰지 않는 422가 표시되는 것을 발견해, spec에 "OpenAPI에는 201·400·500만 문서화"를 추가하고 T8로 구현했다. task·plan에 변경 섹션 추가, 기존 T8은 T9로 옮김.
 
 ## 완료 체크리스트
 - [ ] `uv run ruff check .` / `uv run ruff format .` 통과

@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -33,6 +34,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(job_router.router)
+
+
+# FastAPI는 OpenAPI에 422(HTTPValidationError)를 자동으로 넣지만, 이 서비스는 검증 에러를 400으로 바꿔 응답한다.
+# /docs가 실제 응답과 같도록 기본 OpenAPI를 만든 뒤 422 응답과 그 스키마를 뺀다. 결과는 FastAPI처럼 캐시한다.
+def _openapi_without_422() -> dict[str, Any]:
+    if app.openapi_schema is not None:
+        return app.openapi_schema
+    schema = FastAPI.openapi(app)
+    for path_item in schema.get("paths", {}).values():
+        for operation in path_item.values():
+            operation.get("responses", {}).pop("422", None)
+    schemas = schema.get("components", {}).get("schemas", {})
+    for name in ("HTTPValidationError", "ValidationError"):
+        schemas.pop(name, None)
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _openapi_without_422  # type: ignore[method-assign]
 
 
 # MyApiError는 error_enum에 담긴 상태 코드로 구조화된 JSON 응답을 돌려준다.
