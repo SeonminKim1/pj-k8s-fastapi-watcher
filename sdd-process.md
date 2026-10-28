@@ -165,7 +165,8 @@
 ## 4. TASK — 어떤 순서로
 - 작업 하나는 **반나절~1일 안에 끝나는 크기**로 나누고, `T<번호> [기능명] 작업 내용` 형식으로 씁니다.
 - 작업마다 **선행 작업**을 적고, 이를 바탕으로 **실행 흐름**(순차/병렬 단계)을 만듭니다. 병렬은 서로 의존이 없어 한 단계로 묶어 진행할 수 있다는 뜻입니다.
-- 기본 순서는 레이어 안쪽에서 바깥쪽입니다. 이슈 트래커는 쓰고 싶을 때만 씁니다.
+- 기본 순서는 레이어 안쪽에서 바깥쪽입니다.
+- `CLAUDE.md`에 GitHub Project가 설정돼 있으면, 사용자가 작업 계획을 확인한 뒤 작업마다 이슈를 만들어 Project에 올립니다(아래 "GitHub Project 연동").
 
 **Grill 체크리스트** (Claude가 점검)
 - 하루를 넘는 작업이 없는가?
@@ -190,6 +191,41 @@
 - [ ] T4 [<기능명>] service 로직 + service 테스트 — 선행: T2, T3
 - [ ] T5 [<기능명>] router 연결(컴포넌트는 lifespan 등록), 정상/에러 케이스 확인, 문서 갱신 — 선행: T4
 ```
+GitHub Project 연동 시 각 작업 끝에 이슈 번호를 붙입니다. 예: `- [ ] T1 [<기능명>] models/schemas 정의 — 선행: 없음 — #12`
+
+### GitHub Project 연동 (`gh` CLI)
+`CLAUDE.md`의 "GitHub Project" 항목(owner, Project 번호)이 채워져 있을 때만 사용합니다. 비어 있으면 건너뛰고 그렇다고 알립니다.
+
+**준비** (최초 1회, 사용자가 실행)
+- `gh` 설치 후 `gh auth login`, `gh auth refresh -s project` (Projects는 `project` 스코프가 필요)
+- 저장소에 GitHub remote가 연결돼 있어야 이슈를 만들 수 있습니다.
+- Project에 `Status` 필드(`Todo` / `In Progress` / `Done`)가 있어야 합니다(GitHub 기본 템플릿).
+
+**ID 조회** (`/feat` 실행 중 처음 필요할 때 한 번, `<owner>`·`<number>`는 `CLAUDE.md` 값)
+```bash
+gh project view <number> --owner <owner> --format json --jq .id     # Project ID (PVT_...)
+gh project field-list <number> --owner <owner> --format json \
+  --jq '.fields[] | select(.name=="Status") | {id, options}'          # Status 필드 ID와 옵션 ID
+```
+
+**TASK: 이슈 생성** (사용자가 작업 계획을 확인한 뒤, 이슈가 없는 작업만)
+```bash
+gh issue create --title "T1 [<feature-name>] <작업 내용>" \
+  --body "선행: <없음|#번호>"$'\n\n'"문서: docs/<feature-name>/task.md"   # 출력: 이슈 URL
+gh project item-add <number> --owner <owner> --url <이슈 URL> --format json --jq .id   # 아이템 ID
+```
+- 생성 후 `task.md`의 해당 작업 끝에 `— #<이슈 번호>`를 붙입니다.
+- 아이템 ID는 저장하지 않습니다. 필요할 때 `item-add`를 다시 실행하면 기존 아이템 ID가 그대로 반환됩니다.
+
+**IMPLEMENT: 상태 변경**
+```bash
+gh project item-edit --id <아이템 ID> --project-id <Project ID> \
+  --field-id <Status 필드 ID> --single-select-option-id <옵션 ID>
+gh issue close <이슈 번호> --comment "<바뀐 파일, 테스트 결과 한 줄>"
+```
+- 작업 시작(▶) 시 `In Progress`, 완료(✔) 시 `Done`으로 바꾸고 이슈를 닫습니다.
+- `gh` 명령이 실패해도 구현은 멈추지 않습니다. 실패 내용을 보고하고 `implement.md`의 `## 메모`에 남깁니다.
+- 기존 기능 수정으로 `task.md`에 `## 변경:` 섹션이 추가되면, 새로 생긴 작업만 이슈로 만듭니다.
 
 ## 5. IMPLEMENT — 구현과 확인
 - **브랜치**: `main` ➔ `feature/<feature-name>`으로 작업하고, 끝나면 `main`에 머지합니다.

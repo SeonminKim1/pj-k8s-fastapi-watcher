@@ -11,6 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `src/core/db/mongodb.py`: 공유 `MongoClient`(`get_client()`/`get_database()`). 환경 변수 `MONGO_URI`(기본 `mongodb://localhost:27017`), `MONGO_DB_NAME`(기본 `k8s_client`). repository에서만 사용한다.
 - `src/services/k8s_service.py`: `K8sService` 래퍼. in-cluster 설정을 먼저 시도하고 실패하면 kubeconfig를 읽는다. 클러스터 접근은 반드시 이 클래스를 거친다(테스트에서는 가짜 객체로 대체).
 - `src/main.py`: `PyMongoError`는 500 `db_error`로 처리한다.
+- GitHub Project (`/feat` TASK·IMPLEMENT에서 `gh`로 이슈·상태 관리, 비어 있으면 연동 안 함)
+  - owner: `SeonminKim1`
+  - Project 번호: `3` (https://github.com/users/SeonminKim1/projects/3, 저장소 `SeonminKim1/pj-k8s-fastapi-watcher`에 연결됨)
 
 ## 프로젝트 상세 설명 (요구사항)
 - HTTP API 기능은 `docs/api-*`, watch 같은 백그라운드 기능은 `docs/component-*` 폴더로 문서화한다.
