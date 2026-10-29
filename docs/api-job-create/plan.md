@@ -75,3 +75,10 @@
 - `src/main.py`: `app.openapi`를 감싸, FastAPI 기본 OpenAPI를 만든 뒤 모든 경로의 `422` 응답과 `HTTPValidationError`·`ValidationError` 스키마를 뺀다. 한 번 만든 결과는 FastAPI처럼 `app.openapi_schema`에 캐시한다. 이후 추가되는 엔드포인트에도 그대로 적용된다.
 - `tests/test_main.py`: OpenAPI 전체에 `422`와 두 스키마가 없는지, `POST /jobs`의 400 응답이 `ErrorResponse`인지 확인.
 - 대안: 엔드포인트마다 `responses={422: ...}`를 지정하는 방법은 FastAPI가 422를 계속 추가하므로 뺄 수 없어 쓰지 않는다.
+
+## 변경: 2026-10-29 코드 리뷰 반영
+- `src/main.py`: 검증 에러 핸들러가 `json_invalid`일 때 `X-User-Id`를 `is_user_id`로 직접 확인(리뷰 1).
+- `src/repository/user_job_repository.py`: 이름 중복 시 슬롯을 다시 읽어 다 찼으면 `JobQuotaExceededError`(리뷰 2). `uniq_owner_slot`·`_used_slots`의 `$exists` 조건 제거(리뷰 4).
+- `src/core/exception/validation_error.py`: 타입 태그는 세 번째 loc 요소가 템플릿 필드 이름이 아닐 때만 제거(리뷰 6).
+- `src/models/k8s_names.py`: digest가 있으면 `latest` 허용(리뷰 7).
+- `CLAUDE.md`: 순수 함수 모듈은 주입 예외(리뷰 8).

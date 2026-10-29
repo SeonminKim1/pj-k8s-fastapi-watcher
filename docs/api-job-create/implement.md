@@ -39,7 +39,21 @@
 
 ## 메모
 - `gh issue close`가 `Could not close the issue`를 내면서도 실제로는 닫혔다(#13). 지난 기능과 같은 현상이라 `gh issue view`로 상태만 확인했다.
-- **T4 로컬 MongoDB 확인**(9.0.2 standalone, 임시 DB `k8s_client_t4_check`, 확인 후 삭제): 인덱스 3개 생성(`uniq_owner_slot` partial `{is_deleted: false, quota_slot: {$exists: true}}`), 10개 저장 시 슬롯 0~9, 11번째 한도 초과, 한도가 찬 상태의 중복 이름은 한도 초과가 먼저, soft delete 후 비운 슬롯(3) 재사용, 빈 슬롯이 있을 때 중복 이름은 이름 중복, **동시 15개 → 정확히 10개 성공·나머지 한도 초과**, 같은 이름 동시 5개 → 1개 성공, `quota_slot` 없는 옛 문서 여러 개 저장 가능. 확인 스크립트는 저장소에 두지 않고 확인 후 scratchpad에서도 지웠다. repository를 고치면 같은 항목을 다시 확인한다.
+- **T4 로컬 MongoDB 확인**(9.0.2 standalone, 임시 DB `k8s_client_t4_check`, 확인 후 삭제): 인덱스 3개 생성(`uniq_owner_slot` partial `{is_deleted: false, quota_slot: {$exists: true}}` — 리뷰 4에서 `$exists` 제거), 10개 저장 시 슬롯 0~9, 11번째 한도 초과, 한도가 찬 상태의 중복 이름은 한도 초과가 먼저, soft delete 후 비운 슬롯(3) 재사용, 빈 슬롯이 있을 때 중복 이름은 이름 중복, **동시 15개 → 정확히 10개 성공·나머지 한도 초과**, 같은 이름 동시 5개 → 1개 성공, `quota_slot` 없는 옛 문서 여러 개 저장 가능(리뷰 4에서 이 방어를 없앰. 아래 참고). 확인 스크립트는 저장소에 두지 않고 확인 후 scratchpad에서도 지웠다. repository를 고치면 같은 항목을 다시 확인한다.
 
 - **T9 실제 앱 확인**(uvicorn + 로컬 MongoDB 9.0.2 임시 DB `k8s_client_t9_check` + kubeconfig, 확인 후 DB 삭제·서버 종료): `/docs` 200, 정상 생성 201(응답 필드·기본값·리소스 요약), 이름 중복 `job_name_duplicated`, 헤더 없음 `invalid_user_id`, JSON 아님·정의 안 된 필드(`hostNetwork`) `invalid_parameter`, `invalid_job_name`·`invalid_job_type`·`invalid_image`(latest)·`invalid_port`·`invalid_replicas`·`invalid_env`·`invalid_size`, 10개 후 11번째 `job_quota_exceeded`, **새 유저 동시 요청 15개 → 201 10개·400 5개**. 저장 문서에 `template`(JSON)·`quota_slot`·Deployment·Service 리소스, 인덱스 4개 확인.
 - 다음 기능: `api-job-list`(cursor 페이지네이션 — `limit` 기본값·상한, cursor 인코딩, 인덱스 조정), `api-job-get`·`api-job-delete`, `component-job-operator`(네임스페이스 생성, 이름 재사용 시 `user-job-id` 라벨로 apply 미루기, probe 기반 running 판단).
+
+## 변경: 2026-10-29 코드 리뷰 반영
+`/code-review` 지적 8건 중 5건 반영, 1건 규칙 보완, 2건 보류.
+- 리뷰 1: body JSON 파싱이 실패하면 FastAPI가 헤더 검증을 건너뛰어, `X-User-Id`가 없어도 `invalid_parameter`가 나갔다(재현됨). 검증 에러 핸들러가 `json_invalid`일 때 `X-User-Id`를 직접 확인해 `invalid_user_id`를 먼저 응답. router 테스트 2개 추가.
+- 리뷰 2: 동시 요청으로 슬롯·이름 인덱스가 함께 걸리면 MongoDB는 이름 인덱스(`uniq_owner_name`)만 알려 줘 spec 순서(한도 먼저)와 반대로 `job_name_duplicated`가 나갔다. 이름 중복일 때만 슬롯을 다시 읽어 다 찼으면 한도 초과로 응답.
+- 리뷰 4: `uniq_owner_slot` partial과 `_used_slots`의 `quota_slot $exists` 조건 제거. 옛 문서 방어였지만 모델이 `template`·`quota_slot`을 필수로 요구해 어차피 읽을 수 없고, 한도 계산에서도 빠져 문제를 가렸다. spec대로 옛 문서는 마이그레이션 없이 지운다.
+  - 리뷰 2·4 로컬 MongoDB 확인(임시 DB `k8s_client_review_check`, 확인 후 삭제, 스크립트도 삭제): partial `{is_deleted: false}`, 9개 + 경합 재현(슬롯을 읽은 직후 다른 요청이 슬롯 9에 같은 이름 저장) → MongoDB는 `{owner_id: 1, name: 1}`을 알려 주지만 결과는 `JobQuotaExceededError`, 빈 슬롯이 있을 때 이름 중복은 `DuplicateJobNameError`, 동시 15개 → 10개 성공. 수정 전 코드로 같은 경합을 돌려 `DuplicateJobNameError`가 나는 것도 확인.
+- 리뷰 6: 검증 에러 loc 정규화가 template 아래 세 번째 요소를 무조건 지웠다. 필드 이름(`type`·`image`·`port`…)이 아닐 때만 타입 태그로 보고 지움. 테스트 4개 추가.
+- 리뷰 7: `nginx:latest@sha256:...`처럼 digest가 있으면 이미지가 고정되므로 `latest` 태그도 허용. spec 두 곳·에러 메시지·모델 설명 수정, 테스트 1개 추가.
+- 리뷰 8(규칙 보완): `services/job_templates.py`가 주입 없이 함수로 import된다는 지적. 외부 의존이 없는 순수 함수라 가짜로 바꿀 이유가 없어 코드는 유지하고, `CLAUDE.md` "의존성 주입"에 순수 함수 모듈 예외를 명시.
+- 보류(메모):
+  - 리뷰 3: 한 유저가 한도 근처에서 생성·삭제를 동시에 반복하면 10번 연속 슬롯 경합으로 실제로는 빈 슬롯이 있는데도 한도 초과가 날 수 있다. 재시도 상한을 늘리거나 없애면 무한 경합 위험이 있어 그대로 둔다. 실제로 보고되면 상한을 `max_slots * 2`로 늘리는 것부터 검토한다.
+  - 리뷰 5: selector가 `app.kubernetes.io/name`뿐이라, 지운 job과 같은 이름의 새 job이 서로의 Pod를 고를 수 있다. domain spec "operator에 넘기는 규칙"(다른 `user-job-id` 라벨의 같은 이름 리소스가 있으면 apply를 미룸)으로 두 job의 리소스가 동시에 존재하지 않게 막는다. selector에 `user-job-id`를 넣는 안은 저장 전에 ID를 만들고 "라벨은 operator가 붙인다" 규칙을 바꿔야 하므로 `component-job-operator`에서 다시 본다.
+- 확인: ruff 통과, pytest 213 passed.

@@ -32,4 +32,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 클러스터에 쓰는 것은 operator(백그라운드 컴포넌트)뿐이다. operator는 job과 클러스터를 비교해 리소스를 만들고(server-side apply)·다시 시도하고·삭제된 job의 리소스를 정리하고, 관찰한 결과로 `status`를 갱신한다.
   - operator가 만드는 리소스에는 `app.kubernetes.io/managed-by`와 `user-job-id` 라벨을 붙인다.
   - watch는 이벤트를 놓칠 수 있으므로 주기적으로 전체를 다시 점검(resync)한다. operator는 프로세스 하나에서만 실행한다.
-- **의존성 주입**: service·repository·`K8sService`는 클래스로 만들고 의존 객체를 생성자로 받는다. 실제 객체는 `src/core/dependencies.py`에서만 조립한다(API는 FastAPI `Depends`, operator는 lifespan에서 받는다). 테스트는 가짜 객체를 주입한다.
+- **의존성 주입**: service·repository·`K8sService`는 클래스로 만들고 의존 객체를 생성자로 받는다. 실제 객체는 `src/core/dependencies.py`에서만 조립한다(API는 FastAPI `Depends`, operator는 lifespan에서 받는다). 테스트는 가짜 객체를 주입한다. 단, DB·클러스터 같은 외부 의존이 없고 입력만으로 결과가 정해지는 순수 함수 모듈(예: `services/job_templates.py`)은 클래스·주입 없이 직접 import한다(가짜로 바꿀 이유가 없으므로).
