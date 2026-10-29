@@ -13,8 +13,9 @@ from src.core.dependencies import (
     get_k8s_service,
     get_user_job_repository,
 )
-from src.core.exception.my_exception import MyApiError
+from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.core.exception.validation_error import to_error_enum
+from src.models.k8s_names import is_user_id
 from src.routers import job_router
 
 
@@ -66,11 +67,18 @@ async def my_api_error_handler(request: Request, exc: MyApiError) -> JSONRespons
 
 # 요청 검증 에러(FastAPI 기본 422)는 400으로 바꾸고, 첫 번째(우선순위가 가장 높은) 에러 하나를
 # 필드별 ErrorEnum의 code·message로 알려준다(CLAUDE.md "에러 상태 코드": 400/404/500만 쓴다).
+# body JSON 파싱이 실패하면 FastAPI는 헤더를 검증하지 않고 멈추므로, 그때는 X-User-Id를 직접 확인해
+# 우선순위 1인 invalid_user_id를 먼저 알려준다.
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    error = to_error_enum(exc.errors())
+    errors = exc.errors()
+    json_invalid = any(e.get("type") == "json_invalid" for e in errors)
+    if json_invalid and not is_user_id(request.headers.get("X-User-Id")):
+        error = ErrorEnum.INVALID_USER_ID
+    else:
+        error = to_error_enum(errors)
     return JSONResponse(
         status_code=error.status_code,
         content={"code": error.code, "message": error.message},

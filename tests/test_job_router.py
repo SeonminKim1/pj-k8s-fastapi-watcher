@@ -169,6 +169,19 @@ def test_invalid_json(service: FakeUserJobService) -> None:
     assert_error(r, ErrorEnum.INVALID_PARAMETER)
 
 
+# JSON 파싱이 실패하면 FastAPI가 헤더 검증을 건너뛰지만, 헤더가 없거나 틀리면 여전히 invalid_user_id가 먼저(리뷰 1)
+@pytest.mark.parametrize("headers", [{}, {"X-User-Id": "Bad_User"}])
+def test_invalid_json_without_valid_header(
+    service: FakeUserJobService, headers: dict[str, str]
+) -> None:
+    r = client.post(
+        "/jobs",
+        headers={**headers, "Content-Type": "application/json"},
+        content="notjson",
+    )
+    assert_error(r, ErrorEnum.INVALID_USER_ID)
+
+
 # 여러 개가 틀리면 우선순위가 가장 높은 하나만: 헤더 > 형식 > name > template 필드 순
 @pytest.mark.parametrize(
     ("headers", "payload", "expected"),
