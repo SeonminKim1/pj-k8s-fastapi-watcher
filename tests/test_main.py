@@ -1,10 +1,15 @@
+import json
+
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from kubernetes.config.config_exception import ConfigException
+from pymongo.errors import PyMongoError
 
 from src import main
 from src.core import dependencies
 from src.main import app
+from src.schemas.error import SERVER_ERRORS
 
 client = TestClient(app)
 
@@ -62,3 +67,13 @@ def test_startup_failure_closes_clients(monkeypatch: pytest.MonkeyPatch) -> None
     with pytest.raises(RuntimeError), TestClient(app):
         pass
     assert closed == ["mongo", "k8s"]
+
+
+# 500 에러 example은 전역 핸들러가 실제로 응답하는 본문과 같다.
+async def test_server_error_examples_match_handlers() -> None:
+    request = Request({"type": "http", "headers": []})
+    bodies = [
+        (await main.db_error_handler(request, PyMongoError())).body,
+        (await main.unknown_error_handler(request, RuntimeError())).body,
+    ]
+    assert [json.loads(b) for b in bodies] == [e.model_dump() for e in SERVER_ERRORS]

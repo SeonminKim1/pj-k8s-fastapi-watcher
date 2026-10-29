@@ -10,6 +10,7 @@ from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.main import app
 from src.models.enums import JobStatus
 from src.models.user_job import UserJob, WebTemplate
+from src.schemas.job import JOB_CREATE_EXAMPLES, JOB_RESPONSE_EXAMPLE, JobResponse
 from src.services.job_templates import build_resources
 
 # lifespan을 타지 않도록 with 없이 쓴다(클러스터·MongoDB 불필요).
@@ -220,3 +221,53 @@ def test_openapi_create_job() -> None:
     op = client.get("/openapi.json").json()["paths"]["/jobs"]["post"]
     assert {"201", "400"} <= set(op["responses"])
     assert [p["name"] for p in op["parameters"]] == ["X-User-Id"]
+
+
+# /docs·/redoc의 example: 요청 example은 실제로 201이 나고, 201 example은 JobResponse 모양이다.
+@pytest.mark.parametrize("name", list(JOB_CREATE_EXAMPLES))
+def test_openapi_request_examples_are_valid(
+    service: FakeUserJobService, name: str
+) -> None:
+    payload = JOB_CREATE_EXAMPLES[name]["value"]
+    assert client.post("/jobs", headers=HEADERS, json=payload).status_code == 201
+
+
+def test_openapi_response_example_is_valid(service: FakeUserJobService) -> None:
+    example = JobResponse.model_validate(JOB_RESPONSE_EXAMPLE)
+    # "minimal" 요청의 결과와 id·시각을 뺀 나머지가 같다
+    r = client.post(
+        "/jobs", headers=HEADERS, json=JOB_CREATE_EXAMPLES["minimal"]["value"]
+    )
+    ignore = {"id", "created_at", "updated_at"}
+    assert example.model_dump(mode="json", exclude=ignore) == {
+        k: v for k, v in r.json().items() if k not in ignore
+    }
+
+
+# 에러 example은 code마다 하나이고, 이 엔드포인트가 낼 수 있는 에러를 모두 담는다.
+def test_openapi_error_examples() -> None:
+    responses = client.get("/openapi.json").json()["paths"]["/jobs"]["post"][
+        "responses"
+    ]
+
+    def examples(status: str) -> dict[str, Any]:
+        return responses[status]["content"]["application/json"]["examples"]
+
+    expected_400 = [
+        ErrorEnum.INVALID_USER_ID,
+        ErrorEnum.INVALID_PARAMETER,
+        ErrorEnum.INVALID_JOB_NAME,
+        ErrorEnum.INVALID_JOB_TYPE,
+        ErrorEnum.INVALID_IMAGE,
+        ErrorEnum.INVALID_PORT,
+        ErrorEnum.INVALID_REPLICAS,
+        ErrorEnum.INVALID_ENV,
+        ErrorEnum.INVALID_SIZE,
+        ErrorEnum.JOB_QUOTA_EXCEEDED,
+        ErrorEnum.JOB_NAME_DUPLICATED,
+    ]
+    assert {k: v["value"] for k, v in examples("400").items()} == {
+        e.code: {"code": e.code, "message": e.message} for e in expected_400
+    }
+    assert set(examples("500")) == {"db_error", "unknown_error"}
+    assert "example" in responses["201"]["content"]["application/json"]

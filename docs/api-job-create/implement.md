@@ -64,3 +64,13 @@
 - 동작 변화 없음: 요청·응답·OpenAPI(`type`은 `const: "web"` 그대로), MongoDB 저장 값 동일. import 경로만 바뀜.
 - `CLAUDE.md` 고유 구성에 `models/enums.py` 추가, job 타입 추가 시 `JobType`도 늘리도록 보완.
 - 확인: ruff 통과, pytest 213 passed.
+
+## 변경: 2026-10-29 OpenAPI example
+`/redoc`에 example이 하나도 없어 ReDoc이 `"string"` 같은 샘플을 보여 주고, 400은 어떤 code가 나는지 보이지 않았다.
+- `src/schemas/job.py`: 요청 example `JOB_CREATE_EXAMPLES`(`minimal`·`full`), 201 응답 example `JOB_RESPONSE_EXAMPLE`.
+- `src/schemas/common.py`: `X-User-Id` 헤더 example(`alice`).
+- `src/schemas/error.py`: `error_responses(*ErrorEnum)` — 상태 코드별로 code마다 example 하나, 500(`db_error`·`unknown_error`)은 항상 포함. 500 본문 상수 `DB_ERROR`·`UNKNOWN_ERROR`를 `main.py` 핸들러도 쓴다(문구 중복 제거, 응답 동일).
+- `src/routers/job_router.py`: 위 example 연결, 400 example은 spec 에러 표의 11개 code.
+- 테스트: 요청 example 2개가 실제로 201, 201 example이 `minimal` 요청 결과와 같은 모양, 400·500 example 목록, 500 example = 핸들러 응답. pytest 218 passed.
+- 규칙: `docs/fastapi-sdd-template.md`에 "API 문서 (OpenAPI)" 섹션, `sdd-process.md` 완료 체크리스트에 `/redoc` example 확인, `CLAUDE.md` 고유 구성에 `schemas/error.py`.
+- `/redoc` 화면은 브라우저로 직접 확인하지 않았다(OpenAPI JSON의 media type `examples`·`example`만 확인).

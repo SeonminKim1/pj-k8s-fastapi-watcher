@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -60,3 +61,51 @@ class JobResponse(BaseModel):
             created_at=job.created_at,
             updated_at=job.updated_at,
         )
+
+
+# /docs·/redoc에 보여 줄 요청 body 예. 테스트가 JobCreateRequest로 검증한다.
+JOB_CREATE_EXAMPLES: dict[str, dict[str, Any]] = {
+    "minimal": {
+        "summary": "필수 필드만 (replicas 1, env 없음, size small)",
+        "value": {
+            "name": "my-web",
+            "template": {"type": "web", "image": "nginx:1.27", "port": 80},
+        },
+    },
+    "full": {
+        "summary": "모든 필드",
+        "value": {
+            "name": "my-api",
+            "template": {
+                "type": "web",
+                "image": "ghcr.io/example/api:1.4.2",
+                "port": 8080,
+                "replicas": 2,
+                "env": {"LOG_LEVEL": "info", "APP_MODE": "production"},
+                "size": "medium",
+            },
+        },
+    },
+}
+
+# 201 응답 예("minimal" 요청의 결과). 테스트가 JobResponse로 검증한다.
+JOB_RESPONSE_EXAMPLE: dict[str, Any] = {
+    "id": "6720a1b2c3d4e5f6a7b8c9d0",
+    "name": "my-web",
+    "namespace": "user-alice",
+    "status": "pending",
+    "template": {
+        "type": "web",
+        "image": "nginx:1.27",
+        "port": 80,
+        "replicas": 1,
+        "env": {},
+        "size": "small",
+    },
+    "resources": [
+        {"kind": "Deployment", "name": "my-web"},
+        {"kind": "Service", "name": "my-web"},
+    ],
+    "created_at": "2026-10-29T09:00:00Z",
+    "updated_at": "2026-10-29T09:00:00Z",
+}

@@ -17,6 +17,7 @@ from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.core.exception.validation_error import to_error_enum
 from src.models.k8s_names import is_user_id
 from src.routers import job_router
+from src.schemas.error import DB_ERROR, UNKNOWN_ERROR
 
 
 # 앱 시작 시 클러스터 설정을 읽고 컬렉션 인덱스를 만든다(이미 있으면 그대로).
@@ -88,16 +89,10 @@ async def validation_error_handler(
 # MongoDB 에러는 500 db_error로 응답한다.
 @app.exception_handler(PyMongoError)
 async def db_error_handler(request: Request, exc: PyMongoError) -> JSONResponse:
-    return JSONResponse(
-        status_code=500,
-        content={"code": "db_error", "message": "데이터베이스 오류가 발생했습니다."},
-    )
+    return JSONResponse(status_code=500, content=DB_ERROR.model_dump())
 
 
 # 그 외 모든 예외는 500 unknown_error로 통일한다.
 @app.exception_handler(Exception)
 async def unknown_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(
-        status_code=500,
-        content={"code": "unknown_error", "message": "알 수 없는 오류가 발생했습니다."},
-    )
+    return JSONResponse(status_code=500, content=UNKNOWN_ERROR.model_dump())
