@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.core.exception.my_exception import ErrorEnum
+from src.core.exception.validation_error import error_code
 from src.models.enums import JobStatus
 from src.models.k8s_names import DnsLabel1035
 from src.models.user_job import JobTemplate, UserJob
@@ -13,7 +15,7 @@ class JobCreateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: DnsLabel1035 = Field(
+    name: Annotated[DnsLabel1035, error_code(ErrorEnum.INVALID_JOB_NAME)] = Field(
         description="job 이름. DNS-1035 label(영문 소문자로 시작, 소문자·숫자·'-', 영숫자로 끝, 1~63자). 유저별로 삭제되지 않은 job끼리 유일하며, 생성되는 Deployment·Service 이름으로 쓰인다"
     )
     template: JobTemplate = Field(

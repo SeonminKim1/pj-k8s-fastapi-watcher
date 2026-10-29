@@ -137,6 +137,16 @@ def assert_error(r: Any, expected: ErrorEnum) -> None:
         ),
         (HEADERS, body(template=web(type="db")), ErrorEnum.INVALID_JOB_TYPE),
         (HEADERS, body(template=web(image="nginx")), ErrorEnum.INVALID_IMAGE),
+        (
+            HEADERS,
+            body(template={"type": "web", "port": 80}),
+            ErrorEnum.INVALID_IMAGE,
+        ),  # image 누락
+        (
+            HEADERS,
+            body(template={"type": "web", "image": "nginx:1.27"}),
+            ErrorEnum.INVALID_PORT,
+        ),  # port 누락
         (HEADERS, body(template=web(image="nginx:latest")), ErrorEnum.INVALID_IMAGE),
         (HEADERS, body(template=web(port=65536)), ErrorEnum.INVALID_PORT),
         (HEADERS, body(template=web(port="80")), ErrorEnum.INVALID_PORT),

@@ -74,3 +74,14 @@
 - 테스트: 요청 example 2개가 실제로 201, 201 example이 `minimal` 요청 결과와 같은 모양, 400·500 example 목록, 500 example = 핸들러 응답. pytest 218 passed.
 - 규칙: `docs/fastapi-sdd-template.md`에 "API 문서 (OpenAPI)" 섹션, `sdd-process.md` 완료 체크리스트에 `/redoc` example 확인, `CLAUDE.md` 고유 구성에 `schemas/error.py`.
 - `/redoc` 화면은 브라우저로 직접 확인하지 않았다(OpenAPI JSON의 media type `examples`·`example`만 확인).
+
+## 변경: 2026-10-29 검증 에러 매핑 단순화
+옛 방식은 pydantic 에러의 `loc`을 보고 필드를 거꾸로 찾아 code를 정했다. 그래서 타입 태그 제거(`_normalize_loc`·`_TEMPLATE_FIELDS`), env 하위 키를 위한 접두사 탐색, 필드 정의와 떨어진 위치→에러 표가 필요했다.
+- `src/core/exception/validation_error.py`: `error_code(ErrorEnum)` 추가. 필드 타입을 `WrapValidator`로 감싸, 그 필드 검증이 어떤 이유로 실패하든 에러 종류를 ErrorEnum code로 바꾼다. `_classify`는 에러 종류만 본다(code → 그 에러, `union_tag_*` → `invalid_job_type`, 그 외 → `invalid_parameter`).
+  - 예외 하나: 값이 아예 없으면 필드 검증기가 돌지 않는다. 그래서 누락도 필드 에러로 알려야 하는 필수 필드(`X-User-Id`, `image`, `port`)만 `_MISSING_ERRORS`에서 이름으로 구분한다. 리팩터링 중 이 케이스가 `invalid_parameter`로 바뀌는 것을 발견해 보완했고, router 테스트에 image·port 누락 케이스를 추가했다.
+  - 제거: `_normalize_loc`, `_TEMPLATE_LOC`, `_TEMPLATE_FIELDS`, `_FIELD_ERRORS`, `_MISSING_IS_FORMAT_ERROR`, `_FORMAT_ERROR_TYPES`, 접두사 탐색.
+- `error_code` 연결: `X-User-Id`(`schemas/common.py`), `name`(`schemas/job.py`), `image`·`port`·`replicas`·`env`·`size`(`models/user_job.py`). OpenAPI 스키마(제약·설명)는 그대로다.
+- 응답 동작 변화 없음. spec 에러 표·우선순위 그대로.
+- `tests/test_validation_error.py`: 자체 `_Body` 대신 실제 `JobCreateRequest`로 검증. loc 형태 테스트(리뷰 6) 제거, `error_code` 단위 테스트 추가.
+- `CLAUDE.md`: "새 필드는 위치→에러 표에 추가" → "필드 타입에 `error_code` 붙이기".
+- 확인: ruff 통과, pytest 219 passed.

@@ -1,26 +1,17 @@
-from typing import Any
+from typing import Annotated, Any
 
 import pytest
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from src.core.exception.my_exception import ErrorEnum
-from src.core.exception.validation_error import to_error_enum
-from src.models.k8s_names import DnsLabel1035
-from src.models.user_job import JobTemplate
-
-
-class _Body(BaseModel):
-    """POST /jobs body와 같은 모양. 실제 pydantic 에러 loc으로 매핑을 확인한다(router 연결 전)."""
-
-    model_config = ConfigDict(extra="forbid")
-    name: DnsLabel1035
-    template: JobTemplate
+from src.core.exception.validation_error import error_code, to_error_enum
+from src.schemas.job import JobCreateRequest
 
 
 # body를 검증해 FastAPI처럼 loc 앞에 "body"를 붙인 에러 목록을 만든다.
 def body_errors(body: Any) -> list[dict[str, Any]]:
     with pytest.raises(ValidationError) as exc:
-        _Body.model_validate(body)
+        JobCreateRequest.model_validate(body)
     return [{**e, "loc": ("body", *e["loc"])} for e in exc.value.errors()]
 
 
@@ -100,18 +91,22 @@ def test_body_format_errors(error: dict[str, Any]) -> None:
     assert to_error_enum([error]) == ErrorEnum.INVALID_PARAMETER
 
 
-# 타입 태그가 없는 loc(union이 아닌 template)도 같은 필드 에러로 매핑한다(리뷰 6)
+# error_code(): 필드 검증이 어떤 이유로 실패하든 지정한 code 하나로 바뀐다. 값이 없으면 기본 missing 그대로.
+class _Port(BaseModel):
+    port: Annotated[int, error_code(ErrorEnum.INVALID_PORT)] = Field(ge=1, strict=True)
+
+
 @pytest.mark.parametrize(
-    ("loc", "expected"),
-    [
-        (("body", "template", "port"), ErrorEnum.INVALID_PORT),
-        (("body", "template", "image"), ErrorEnum.INVALID_IMAGE),
-        (("body", "template", "env", "1A", "[key]"), ErrorEnum.INVALID_ENV),
-        (("body", "template", "web", "port"), ErrorEnum.INVALID_PORT),  # 태그 있음
-    ],
+    ("data", "expected_type"),
+    [({"port": 0}, "invalid_port"), ({"port": "80"}, "invalid_port"), ({}, "missing")],
 )
-def test_loc_with_or_without_type_tag(loc: tuple, expected: ErrorEnum) -> None:
-    assert to_error_enum([{"type": "value_error", "loc": loc}]) == expected
+def test_error_code(data: dict[str, Any], expected_type: str) -> None:
+    with pytest.raises(ValidationError) as exc:
+        _Port.model_validate(data)
+    [error] = exc.value.errors()
+    assert error["type"] == expected_type
+    if expected_type == "invalid_port":
+        assert error["msg"] == ErrorEnum.INVALID_PORT.message
 
 
 def test_empty_errors() -> None:
