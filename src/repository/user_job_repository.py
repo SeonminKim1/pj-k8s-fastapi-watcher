@@ -53,15 +53,11 @@ class UserJobRepository:
             unique=True,
             partialFilterExpression={"is_deleted": False},
         )
-        # quota_slot이 없는 문서는 빼서, 없는 값(null)끼리 중복으로 걸리지 않게 한다.
         await self.collection.create_index(
             [("owner_id", 1), ("quota_slot", 1)],
             name="uniq_owner_slot",
             unique=True,
-            partialFilterExpression={
-                "is_deleted": False,
-                "quota_slot": {"$exists": True},
-            },
+            partialFilterExpression={"is_deleted": False},
         )
         await self.collection.create_index(
             [("owner_id", 1), ("created_at", DESCENDING)],
@@ -71,11 +67,7 @@ class UserJobRepository:
     # 삭제되지 않은 job이 차지한 슬롯 번호들.
     async def _used_slots(self, owner_id: str) -> set[int]:
         cursor = self.collection.find(
-            {
-                "owner_id": owner_id,
-                "is_deleted": False,
-                "quota_slot": {"$exists": True},
-            },
+            {"owner_id": owner_id, "is_deleted": False},
             {"quota_slot": 1, "_id": 0},
         )
         return {doc["quota_slot"] async for doc in cursor}
@@ -84,7 +76,9 @@ class UserJobRepository:
     # - 빈 슬롯이 없으면 JobQuotaExceededError
     # - 동시 요청과 슬롯이 겹치면 다시 골라 재시도. 겹칠 때마다 다른 요청이 슬롯을 하나 차지한 것이므로
     #   max_slots번 겹치면 슬롯이 다 찬 것으로 보고 JobQuotaExceededError
-    # - 이름이 겹치면 DuplicateJobNameError, 그 외 유니크 위반은 그대로 올려 500(db_error)
+    # - 이름이 겹치면 DuplicateJobNameError. 단, 그사이 슬롯이 다 찼으면 JobQuotaExceededError(한도가 먼저).
+    #   동시 요청으로 슬롯·이름 인덱스가 함께 걸리면 MongoDB는 하나만 알려주므로 슬롯을 다시 읽어 판단한다.
+    # - 그 외 유니크 위반은 그대로 올려 500(db_error)
     async def insert_with_slot(
         self, job_doc: dict[str, Any], max_slots: int
     ) -> UserJob:
@@ -100,6 +94,8 @@ class UserJobRepository:
             except DuplicateKeyError as e:
                 key_pattern = (e.details or {}).get("keyPattern")
                 if key_pattern == _OWNER_NAME_KEY:
+                    if len(await self._used_slots(owner_id)) >= max_slots:
+                        raise JobQuotaExceededError from e
                     raise DuplicateJobNameError from e
                 if key_pattern == _OWNER_SLOT_KEY:
                     continue
