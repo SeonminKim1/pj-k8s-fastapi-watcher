@@ -2,11 +2,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
+from src.models.enums import JobStatus
 from src.models.k8s_names import is_dns_1035_label, is_user_id
 from src.models.user_job import (
     ALLOWED_STATUS_TRANSITIONS,
     MAX_JOBS_PER_USER,
-    JobStatus,
     JobTemplate,
     UserJob,
 )

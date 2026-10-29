@@ -1,7 +1,8 @@
 from collections.abc import Callable
 from typing import Any
 
-from src.models.user_job import JobResource, JobSize, JobTemplate, WebTemplate
+from src.models.enums import JobSize, JobType
+from src.models.user_job import JobResource, JobTemplate, WebTemplate
 
 # 템플릿 입력 → 매니페스트 생성. 유저가 정하지 않는 값(라벨, 리소스, 보안 설정 등)은 여기서 고정한다.
 # 타입을 추가하면 생성 함수 하나와 _BUILDERS·KINDS_BY_TYPE 한 줄씩을 더한다.
@@ -13,8 +14,8 @@ SIZE_PRESETS: dict[JobSize, dict[str, str]] = {
 }
 
 # 타입별로 만드는 (apiVersion, kind). operator가 정리·검증할 때 기준이 된다.
-KINDS_BY_TYPE: dict[str, frozenset[tuple[str, str]]] = {
-    "web": frozenset({("apps/v1", "Deployment"), ("v1", "Service")}),
+KINDS_BY_TYPE: dict[JobType, frozenset[tuple[str, str]]] = {
+    JobType.WEB: frozenset({("apps/v1", "Deployment"), ("v1", "Service")}),
 }
 
 # Deployment selector와 Service selector가 함께 쓰는 라벨 키. selector는 생성 후 바꿀 수 없다.
@@ -84,8 +85,9 @@ def _build_web(name: str, namespace: str, template: WebTemplate) -> list[JobReso
     return [_resource(deployment), _resource(service)]
 
 
-_BUILDERS: dict[str, Callable[[str, str, Any], list[JobResource]]] = {
-    "web": _build_web,
+_BUILDERS: dict[JobType, Callable[[str, str, Any], list[JobResource]]] = {
+    JobType.WEB: _build_web,
+    # 추후 JobType.DB: _build_db 등
 }
 
 

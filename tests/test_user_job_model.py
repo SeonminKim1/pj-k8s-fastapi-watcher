@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from src.models.enums import JobSize
 from src.models.k8s_names import (
     DnsLabel1035,
     UserId,
@@ -10,7 +11,7 @@ from src.models.k8s_names import (
     is_pinned_image,
     is_user_id,
 )
-from src.models.user_job import JobSize, JobTemplate, WebTemplate
+from src.models.user_job import JobTemplate, WebTemplate
 
 template_adapter = TypeAdapter(JobTemplate)
 

@@ -57,3 +57,10 @@
   - 리뷰 3: 한 유저가 한도 근처에서 생성·삭제를 동시에 반복하면 10번 연속 슬롯 경합으로 실제로는 빈 슬롯이 있는데도 한도 초과가 날 수 있다. 재시도 상한을 늘리거나 없애면 무한 경합 위험이 있어 그대로 둔다. 실제로 보고되면 상한을 `max_slots * 2`로 늘리는 것부터 검토한다.
   - 리뷰 5: selector가 `app.kubernetes.io/name`뿐이라, 지운 job과 같은 이름의 새 job이 서로의 Pod를 고를 수 있다. domain spec "operator에 넘기는 규칙"(다른 `user-job-id` 라벨의 같은 이름 리소스가 있으면 apply를 미룸)으로 두 job의 리소스가 동시에 존재하지 않게 막는다. selector에 `user-job-id`를 넣는 안은 저장 전에 ID를 만들고 "라벨은 operator가 붙인다" 규칙을 바꿔야 하므로 `component-job-operator`에서 다시 본다.
 - 확인: ruff 통과, pytest 213 passed.
+
+## 변경: 2026-10-29 도메인 enum 모으기
+- `src/models/enums.py`(신규): `JobStatus`·`JobSize`를 `models/user_job.py`에서 옮기고, 문자열 `"web"`으로 흩어져 있던 job 타입을 `JobType` enum으로 만듦(`WebTemplate.type: Literal[JobType.WEB]`, `KINDS_BY_TYPE`·`_BUILDERS` 키).
+- `ErrorEnum`은 `MyApiError`와 짝이고 공통 템플릿이 `my_exception.py`에 두도록 정하고 있어 그대로 둠.
+- 동작 변화 없음: 요청·응답·OpenAPI(`type`은 `const: "web"` 그대로), MongoDB 저장 값 동일. import 경로만 바뀜.
+- `CLAUDE.md` 고유 구성에 `models/enums.py` 추가, job 타입 추가 시 `JobType`도 늘리도록 보완.
+- 확인: ruff 통과, pytest 213 passed.

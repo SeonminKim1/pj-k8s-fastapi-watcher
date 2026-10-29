@@ -8,7 +8,8 @@ from pymongo import DESCENDING, ReturnDocument
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
-from src.models.user_job import JobStatus, UserJob
+from src.models.enums import JobStatus
+from src.models.user_job import UserJob
 
 
 class DuplicateJobNameError(Exception):

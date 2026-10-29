@@ -5,7 +5,8 @@ from typing import Any
 import pytest
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
-from src.models.user_job import MAX_JOBS_PER_USER, JobStatus, UserJob, WebTemplate
+from src.models.enums import JobStatus
+from src.models.user_job import MAX_JOBS_PER_USER, UserJob, WebTemplate
 from src.repository.user_job_repository import (
     DuplicateJobNameError,
     JobQuotaExceededError,

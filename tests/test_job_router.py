@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 from src.core.dependencies import get_user_job_service
 from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.main import app
-from src.models.user_job import JobStatus, UserJob, WebTemplate
+from src.models.enums import JobStatus
+from src.models.user_job import UserJob, WebTemplate
 from src.services.job_templates import build_resources
 
 # lifespan을 타지 않도록 with 없이 쓴다(클러스터·MongoDB 불필요).

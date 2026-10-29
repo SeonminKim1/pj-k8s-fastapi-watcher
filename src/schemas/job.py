@@ -2,8 +2,9 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.models.enums import JobStatus
 from src.models.k8s_names import DnsLabel1035
-from src.models.user_job import JobStatus, JobTemplate, UserJob
+from src.models.user_job import JobTemplate, UserJob
 
 
 class JobCreateRequest(BaseModel):

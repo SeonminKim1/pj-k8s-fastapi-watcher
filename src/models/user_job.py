@@ -1,21 +1,13 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.models.enums import JobSize, JobStatus, JobType
 from src.models.k8s_names import EnvName, ImageRef
 
 # 유저 한 명이 가질 수 있는 삭제되지 않은 job 수(CLAUDE.md "유저별 job 개수 제한").
 MAX_JOBS_PER_USER = 10
-
-
-class JobStatus(StrEnum):
-    """operator가 클러스터를 관찰해 갱신하는 job 상태. 삭제는 상태가 아니라 is_deleted로 표시한다."""
-
-    PENDING = "pending"
-    RUNNING = "running"
-    FAILED = "failed"
 
 
 # 이전 상태 → 갈 수 있는 다음 상태. pending으로 돌아가는 전이는 없다.
@@ -26,19 +18,12 @@ ALLOWED_STATUS_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 }
 
 
-class JobSize(StrEnum):
-    """컨테이너 크기 프리셋. 실제 cpu·memory 값은 매니페스트를 만들 때 정한다."""
-
-    SMALL = "small"
-    MEDIUM = "medium"
-
-
 class WebTemplate(BaseModel):
     """web 타입 템플릿 입력: 상시 실행 서비스(Deployment + ClusterIP Service). 정의되지 않은 필드는 받지 않는다."""
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["web"] = Field(description="job 타입. web")
+    type: Literal[JobType.WEB] = Field(description="job 타입. web")
     image: ImageRef
     port: int = Field(
         ge=1,
