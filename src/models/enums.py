@@ -1,4 +1,4 @@
-    from enum import StrEnum
+from enum import StrEnum
 
 # 도메인 enum을 한 곳에 모은다. 에러 종류(ErrorEnum)는 MyApiError와 짝이라 core/exception에 둔다.
 
