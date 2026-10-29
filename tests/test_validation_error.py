@@ -100,5 +100,19 @@ def test_body_format_errors(error: dict[str, Any]) -> None:
     assert to_error_enum([error]) == ErrorEnum.INVALID_PARAMETER
 
 
+# 타입 태그가 없는 loc(union이 아닌 template)도 같은 필드 에러로 매핑한다(리뷰 6)
+@pytest.mark.parametrize(
+    ("loc", "expected"),
+    [
+        (("body", "template", "port"), ErrorEnum.INVALID_PORT),
+        (("body", "template", "image"), ErrorEnum.INVALID_IMAGE),
+        (("body", "template", "env", "1A", "[key]"), ErrorEnum.INVALID_ENV),
+        (("body", "template", "web", "port"), ErrorEnum.INVALID_PORT),  # 태그 있음
+    ],
+)
+def test_loc_with_or_without_type_tag(loc: tuple, expected: ErrorEnum) -> None:
+    assert to_error_enum([{"type": "value_error", "loc": loc}]) == expected
+
+
 def test_empty_errors() -> None:
     assert to_error_enum([]) == ErrorEnum.INVALID_PARAMETER

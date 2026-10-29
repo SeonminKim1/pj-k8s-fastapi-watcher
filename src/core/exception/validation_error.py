@@ -38,14 +38,24 @@ _FORMAT_ERROR_TYPES = {"json_invalid", "extra_forbidden"}
 
 # template 아래 loc에는 discriminated union의 타입 태그가 끼어 있다: ("body", "template", "web", "port")
 _TEMPLATE_LOC = ("body", "template")
+# template 바로 아래에 올 수 있는 필드 이름. loc의 세 번째 요소가 이 중 하나면 타입 태그가 없는 것이다.
+_TEMPLATE_FIELDS = {"type"} | {
+    key[2] for key in _FIELD_ERRORS if key[:2] == _TEMPLATE_LOC and len(key) == 3
+}
 
 
 # loc을 비교하기 쉬운 형태로 바꾼다: 문자열로, 헤더 이름은 소문자로, template 아래의 타입 태그는 뺀다.
+# 타입 태그는 discriminated union일 때만 끼어 있으므로, 세 번째 요소가 필드 이름이면 그대로 둔다
+# (union 구성이 바뀌어 태그가 사라져도 필드 에러가 invalid_parameter로 뭉개지지 않게).
 def _normalize_loc(loc: Sequence[Any]) -> tuple[str, ...]:
     parts = tuple(str(p) for p in loc)
     if parts[:1] == ("header",):
         parts = tuple(p.lower() for p in parts)
-    if parts[:2] == _TEMPLATE_LOC and len(parts) >= 3:
+    if (
+        parts[:2] == _TEMPLATE_LOC
+        and len(parts) >= 3
+        and parts[2] not in _TEMPLATE_FIELDS
+    ):
         parts = _TEMPLATE_LOC + parts[3:]
     return parts
 
