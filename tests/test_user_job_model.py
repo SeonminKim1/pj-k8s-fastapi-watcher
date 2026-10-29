@@ -55,6 +55,8 @@ def test_web_template_all_fields() -> None:
         "registry.example.com:443/a/b/c:1",
         "nginx@sha256:" + "a" * 64,
         "nginx:1.27@sha256:" + "0" * 64,
+        "nginx:latest@sha256:"
+        + "0" * 64,  # digest가 이미지를 고정하므로 latest도 허용(리뷰 7)
         "my__app-x.y:1",
     ],
 )

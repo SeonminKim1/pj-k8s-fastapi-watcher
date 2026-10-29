@@ -18,7 +18,7 @@
 | 필드 | 타입 | 필수 | 기본값 | 제약 |
 |---|---|---|---|---|
 | `type` | `"web"` | O | | |
-| `image` | `str` | O | | 이미지 참조 `[레지스트리[:포트]/]경로(:태그 \| @sha256:digest \| :태그@sha256:digest)`, 1~512자, 공백 불가. 태그나 digest가 꼭 있어야 하며 태그 `latest`는 안 된다 |
+| `image` | `str` | O | | 이미지 참조 `[레지스트리[:포트]/]경로(:태그 \| @sha256:digest \| :태그@sha256:digest)`, 1~512자, 공백 불가. 태그나 digest가 꼭 있어야 하며 digest 없이 태그 `latest`만 있으면 안 된다(digest가 있으면 이미지가 고정되므로 허용) |
 | `port` | `int` | O | | 컨테이너 포트 1~65535. Service port도 같은 값 |
 | `replicas` | `int` | X | `1` | 1~2 |
 | `env` | `dict[str, str]` | X | `{}` | 최대 20개. 이름 `[A-Za-z_][A-Za-z0-9_]*`(1~63자), 값 0~1024자. MongoDB에 평문으로 저장되므로 비밀값을 넣지 않는다(`/docs` 필드 설명에 명시) |
@@ -83,7 +83,7 @@
 | 2 | body가 JSON이 아님·객체가 아님, `name`·`template` 누락, 정의되지 않은 필드 | `INVALID_PARAMETER` (`invalid_parameter`) | 요청 형식이 올바르지 않습니다. |
 | 3 | `name` 형식 오류 | `INVALID_JOB_NAME` (`invalid_job_name`) | job 이름은 영문 소문자로 시작하는 1~63자(소문자·숫자·'-')여야 합니다. |
 | 4 | `template.type` 누락·지원하지 않는 값 | `INVALID_JOB_TYPE` (`invalid_job_type`) | 지원하지 않는 job 타입입니다. (지원: web) |
-| 5 | `template.image` 누락·형식 오류·태그 없음·`latest` | `INVALID_IMAGE` (`invalid_image`) | 이미지는 태그나 digest를 포함해야 하며 latest 태그는 쓸 수 없습니다. |
+| 5 | `template.image` 누락·형식 오류·태그 없음·digest 없는 `latest` | `INVALID_IMAGE` (`invalid_image`) | 이미지는 태그나 digest를 포함해야 하며, digest 없이 latest 태그는 쓸 수 없습니다. |
 | 6 | `template.port` 누락·정수 아님·범위 밖 | `INVALID_PORT` (`invalid_port`) | port는 1~65535 사이의 정수여야 합니다. |
 | 7 | `template.replicas` 정수 아님·범위 밖 | `INVALID_REPLICAS` (`invalid_replicas`) | replicas는 1~2 사이의 정수여야 합니다. |
 | 8 | `template.env` 객체 아님·20개 초과·이름 형식·값 길이 | `INVALID_ENV` (`invalid_env`) | env는 최대 20개, 이름은 [A-Za-z_][A-Za-z0-9_]*, 값은 1024자 이하여야 합니다. |

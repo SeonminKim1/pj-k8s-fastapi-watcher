@@ -41,8 +41,8 @@ def is_env_name(value: Any) -> bool:
     return isinstance(value, str) and bool(_ENV_NAME_RE.fullmatch(value))
 
 
-# 이미지 참조인지 본다. 태그나 digest가 꼭 있어야 하고 태그 latest는 안 된다
-# (imagePullPolicy: IfNotPresent라 latest면 노드마다 다른 이미지가 돌 수 있다).
+# 이미지 참조인지 본다. 태그나 digest가 꼭 있어야 하고, digest 없이 태그 latest만 있으면 안 된다
+# (imagePullPolicy: IfNotPresent라 latest면 노드마다 다른 이미지가 돌 수 있다. digest가 있으면 이미지가 고정된다).
 def is_pinned_image(value: Any) -> bool:
     if not isinstance(value, str) or len(value) > _IMAGE_MAX_LENGTH:
         return False
@@ -50,9 +50,9 @@ def is_pinned_image(value: Any) -> bool:
     if m is None:
         return False
     tag, digest = m.group("tag"), m.group("digest")
-    if tag is None and digest is None:
-        return False
-    return tag != "latest"
+    if digest is not None:
+        return True
+    return tag is not None and tag != "latest"
 
 
 # is_* 함수를 pydantic 검증기로 감싼다. 틀리면 ValueError(→ pydantic ValidationError).
@@ -81,7 +81,7 @@ ImageRef = Annotated[
     str,
     _validator(is_pinned_image, "태그나 digest가 있는 이미지 참조가 아닙니다."),
     Field(
-        description="컨테이너 이미지 참조 [레지스트리[:포트]/]경로(:태그|@sha256:digest), 1~512자. 태그나 digest 필수, latest 불가"
+        description="컨테이너 이미지 참조 [레지스트리[:포트]/]경로(:태그|@sha256:digest), 1~512자. 태그나 digest 필수, digest 없는 latest 불가"
     ),
 ]
 EnvName = Annotated[

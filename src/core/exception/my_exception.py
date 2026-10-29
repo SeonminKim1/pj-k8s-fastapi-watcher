@@ -23,7 +23,7 @@ class ErrorEnum(Enum):
     INVALID_IMAGE = (
         "invalid_image",
         400,
-        "이미지는 태그나 digest를 포함해야 하며 latest 태그는 쓸 수 없습니다.",
+        "이미지는 태그나 digest를 포함해야 하며, digest 없이 latest 태그는 쓸 수 없습니다.",
     )
     INVALID_PORT = ("invalid_port", 400, "port는 1~65535 사이의 정수여야 합니다.")
     INVALID_REPLICAS = (

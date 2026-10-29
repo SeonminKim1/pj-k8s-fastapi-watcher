@@ -23,7 +23,7 @@
 | 필드 | 타입 | 기본값 | 제약 |
 |---|---|---|---|
 | `type` | `"web"` | | |
-| `image` | `str` | | 이미지 참조 `[레지스트리[:포트]/]경로(:태그 \| @sha256:digest \| :태그@sha256:digest)`, 1~512자, 공백 불가. 태그나 digest 필수, 태그 `latest` 불가(`imagePullPolicy: IfNotPresent`라 노드마다 다른 이미지가 돌 수 있음) |
+| `image` | `str` | | 이미지 참조 `[레지스트리[:포트]/]경로(:태그 \| @sha256:digest \| :태그@sha256:digest)`, 1~512자, 공백 불가. 태그나 digest 필수, digest 없는 태그 `latest` 불가(`imagePullPolicy: IfNotPresent`라 노드마다 다른 이미지가 돌 수 있음) |
 | `port` | `int` | | 1~65535 |
 | `replicas` | `int` | `1` | 1~2 |
 | `env` | `dict[str, str]` | `{}` | 최대 20개. 이름 `[A-Za-z_][A-Za-z0-9_]*`(1~63자), 값 0~1024자. MongoDB에 평문으로 저장되므로 비밀값을 넣지 않는다 |
