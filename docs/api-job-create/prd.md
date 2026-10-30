@@ -1,0 +1,23 @@
+# PRD: job 생성 API
+- **배경/목적**: user-job 도메인(`docs/domain-user-job/`)은 service까지만 있고 외부에서 job을 만들 방법이 없다. 유저가 HTTP로 job을 등록할 수 있어야 operator가 이를 원하는 상태(desired)로 보고 클러스터에 반영할 수 있다. 이때 유저가 매니페스트를 직접 쓰면 위험한 설정(privileged, hostPath, LoadBalancer, 리소스 제한 없음 등)을 막기 어려우므로, 템플릿 방식으로 입력 범위를 한정한다.
+- **대상 사용자**: 게이트웨이를 거쳐 들어오는 서비스 유저(`X-User-Id`로 식별)
+- **하는 일**: 유저가 job 이름, job 타입(`web`), 그 타입이 허용하는 필드(이미지, 포트, 레플리카 수, 환경 변수, 크기 프리셋)를 보내면, 서버가 검증한 뒤 고정된 기본값으로 매니페스트(Deployment + Service)를 생성해 `pending` 상태의 job으로 MongoDB에 저장하고, 저장된 job을 바로 돌려준다. 클러스터에는 쓰지 않는다. 리소스 생성은 operator가 하고 유저는 job `status`로 진행 상황을 본다.
+- **비즈니스 규칙/제약**:
+  - 유저 식별은 `CLAUDE.md`의 "유저 식별" 규칙(`X-User-Id`)을 따른다. job의 소유자는 이 유저다.
+  - 입력은 `CLAUDE.md`의 "job 입력은 템플릿 방식"을 따른다. 이번에 지원하는 타입은 `web` 하나다.
+    - `web`: 상시 실행 서비스. Deployment 1개 + Service 1개(ClusterIP 고정)를 만든다.
+    - 유저가 정하는 값: 이미지, 컨테이너 포트, 레플리카 수, 환경 변수, 크기 프리셋. 각 값의 형식·범위·기본값과 프리셋 목록은 SPEC에서 정한다.
+    - 서버가 고정하는 값: 네임스페이스, 리소스 이름, 라벨, 리소스 requests/limits(크기 프리셋으로만 결정), 보안 설정, Service 타입 등. 유저는 바꿀 수 없다.
+  - 유저당 job 개수 제한은 `CLAUDE.md`의 "유저별 job 개수 제한"(삭제되지 않은 job 10개)을 따른다. 넘으면 400.
+  - job 이름 형식과 이름 중복 규칙은 `docs/domain-user-job/spec.md`를 따른다.
+  - API는 클러스터에 쓰지 않는다(`CLAUDE.md`의 "operator 패턴"). 유저 네임스페이스 `user-{유저 ID}`가 클러스터에 없어도 생성 요청은 성공하고, 네임스페이스 생성은 operator가 맡는다.
+  - 에러 상태 코드는 `CLAUDE.md`의 "에러 상태 코드" 규칙(400/404/500)을 따른다. FastAPI 기본 요청 검증 에러(422)도 400으로 응답하며, 어느 필드가 왜 틀렸는지 알 수 있게 필드별 에러 `code`·`message`로 구분한다.
+- **완료 기준**: 유저가 `X-User-Id`와 함께 `web` 타입 job을 요청하면, 서버가 생성한 Deployment·Service 매니페스트를 가진 `pending` 상태의 job이 MongoDB에 저장되고 응답으로 돌아온다. 잘못된 입력, 허용되지 않는 필드, 이름 중복, 개수 초과는 400으로 거절된다.
+- **범위 제외**:
+  - `web` 외 타입(batch, worker 등) → 필요할 때 타입 추가
+  - 유저가 매니페스트를 직접 보내는 입력(JSON 원본, YAML)
+  - job 조회·삭제 API → 이후 `api-job-*`
+  - 클러스터 리소스·네임스페이스 생성 → 이후 `component-job-operator`
+  - 같은 요청을 여러 번 보낼 때의 멱등성 키(이름 중복 규칙으로 두 번째 요청은 400이 된다)
+- **관련 요구사항**: `CLAUDE.md`의 "유저 식별", "유저별 네임스페이스", "유저별 job 개수 제한", "job 입력은 템플릿 방식", "에러 상태 코드", "operator 패턴", "의존성 주입"
+  - `docs/domain-user-job/`: 현재 `create_job`은 매니페스트 목록을 입력받는다. 템플릿 입력으로 바꾸고 job 문서에 유저 입력(타입·필드)을 저장하는 변경이 필요하다. SPEC 단계에서 `domain-user-job/spec.md`를 함께 고친다.

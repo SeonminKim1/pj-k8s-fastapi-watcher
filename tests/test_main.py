@@ -1,10 +1,15 @@
+import json
+
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from kubernetes.config.config_exception import ConfigException
+from pymongo.errors import PyMongoError
 
 from src import main
 from src.core import dependencies
 from src.main import app
+from src.schemas.error import DB_ERROR, UNKNOWN_ERROR
 
 client = TestClient(app)
 
@@ -13,6 +18,22 @@ client = TestClient(app)
 def test_openapi_docs() -> None:
     response = client.get("/docs")
     assert response.status_code == 200
+
+
+# 검증 에러는 400으로 바꿔 응답하므로 OpenAPI에 422와 그 스키마가 없어야 한다(/docs가 실제 응답과 같게).
+def test_openapi_has_no_422() -> None:
+    schema = client.get("/openapi.json").json()
+    for path, path_item in schema["paths"].items():
+        for method, operation in path_item.items():
+            assert "422" not in operation["responses"], (method, path)
+    schemas = schema["components"]["schemas"]
+    assert "HTTPValidationError" not in schemas
+    assert "ValidationError" not in schemas
+    # 문서화된 400 응답은 실제 에러 모양({code, message})
+    bad_request = schema["paths"]["/jobs"]["post"]["responses"]["400"]
+    assert bad_request["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
 
 
 # 클러스터 설정(in-cluster·kubeconfig)이 모두 없으면 앱 시작이 실패한다. MongoDB보다 먼저 확인하므로 DB 없이 검증된다.
@@ -46,3 +67,16 @@ def test_startup_failure_closes_clients(monkeypatch: pytest.MonkeyPatch) -> None
     with pytest.raises(RuntimeError), TestClient(app):
         pass
     assert closed == ["mongo", "k8s"]
+
+
+# 500 본문 상수(/docs example에도 쓰임)는 전역 핸들러가 실제로 응답하는 본문과 같다.
+async def test_server_error_examples_match_handlers() -> None:
+    request = Request({"type": "http", "headers": []})
+    bodies = [
+        (await main.db_error_handler(request, PyMongoError())).body,
+        (await main.unknown_error_handler(request, RuntimeError())).body,
+    ]
+    assert [json.loads(b) for b in bodies] == [
+        DB_ERROR.model_dump(),
+        UNKNOWN_ERROR.model_dump(),
+    ]

@@ -1,27 +1,16 @@
 from datetime import datetime
-from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from src.core.exception.my_exception import ErrorEnum
+from src.core.exception.validation_error import error_code
+from src.models.enums import JobSize, JobStatus, JobType
+from src.models.k8s_names import EnvName, ImageRef
 
-class JobStatus(StrEnum):
-    """operator가 클러스터를 관찰해 갱신하는 job 상태. 삭제는 상태가 아니라 is_deleted로 표시한다."""
+# 유저 한 명이 가질 수 있는 삭제되지 않은 job 수(CLAUDE.md "유저별 job 개수 제한").
+MAX_JOBS_PER_USER = 10
 
-    PENDING = "pending"
-    RUNNING = "running"
-    FAILED = "failed"
-
-
-# job을 구성할 수 있는 (apiVersion, kind). Secret은 매니페스트가 평문으로 저장되므로 제외한다.
-ALLOWED_RESOURCE_KINDS: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("apps/v1", "Deployment"),
-        ("v1", "Service"),
-        ("v1", "ConfigMap"),
-        ("batch/v1", "Job"),
-    }
-)
 
 # 이전 상태 → 갈 수 있는 다음 상태. pending으로 돌아가는 전이는 없다.
 ALLOWED_STATUS_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
@@ -31,16 +20,50 @@ ALLOWED_STATUS_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 }
 
 
+class WebTemplate(BaseModel):
+    """web 타입 템플릿 입력: 상시 실행 서비스(Deployment + ClusterIP Service). 정의되지 않은 필드는 받지 않는다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal[JobType.WEB] = Field(description="job 타입. web")
+    image: Annotated[ImageRef, error_code(ErrorEnum.INVALID_IMAGE)]
+    port: Annotated[int, error_code(ErrorEnum.INVALID_PORT)] = Field(
+        ge=1,
+        le=65535,
+        strict=True,
+        description="컨테이너 포트 1~65535. Service port도 같은 값",
+    )
+    replicas: Annotated[int, error_code(ErrorEnum.INVALID_REPLICAS)] = Field(
+        default=1, ge=1, le=2, strict=True, description="레플리카 수 1~2. 기본 1"
+    )
+    env: Annotated[
+        dict[EnvName, Annotated[str, Field(max_length=1024)]],
+        error_code(ErrorEnum.INVALID_ENV),
+    ] = Field(
+        default_factory=dict,
+        max_length=20,
+        description="환경 변수(최대 20개, 값 1024자 이하). MongoDB에 평문으로 저장되므로 비밀값을 넣지 않는다",
+    )
+    size: Annotated[JobSize, error_code(ErrorEnum.INVALID_SIZE)] = Field(
+        default=JobSize.SMALL,
+        description="크기 프리셋(requests = limits). small: cpu 100m / memory 128Mi, medium: cpu 250m / memory 256Mi. 기본 small",
+    )
+
+
+# type으로 구분하는 템플릿 입력. 타입을 추가하면 Union에 넣는다(예: WebTemplate | DbTemplate).
+JobTemplate = Annotated[WebTemplate, Field(discriminator="type")]
+
+
 class JobResource(BaseModel):
     """job을 구성하는 리소스 하나. api_version·kind·name은 manifest에서 꺼낸 조회용 값이다."""
 
     api_version: str = Field(description="매니페스트의 apiVersion. 예: apps/v1")
-    kind: str = Field(description="매니페스트의 kind. ALLOWED_RESOURCE_KINDS 중 하나")
-    name: str = Field(
-        description="매니페스트의 metadata.name. Service는 DNS-1035 label(1~63자), Job은 DNS-1123 label(1~63자), 나머지는 DNS-1123 subdomain(1~253자)"
+    kind: str = Field(
+        description="매니페스트의 kind. 템플릿 타입별 목록(services/job_templates.py의 KINDS_BY_TYPE) 중 하나"
     )
+    name: str = Field(description="매니페스트의 metadata.name. web 템플릿은 job 이름")
     manifest: dict[str, Any] = Field(
-        description="operator가 server-side apply할 매니페스트 원본. metadata.namespace는 job 네임스페이스로 채워진다"
+        description="operator가 server-side apply할 매니페스트. 템플릿으로 서버가 생성한다"
     )
 
 
@@ -55,10 +78,16 @@ class UserJob(BaseModel):
         description="소유자 네임스페이스 user-{owner_id}. 생성 시 서버가 정한다"
     )
     name: str = Field(
-        description="유저가 정하는 job 이름. DNS-1123 label(1~63자), 삭제되지 않은 job끼리 유저별 유일"
+        description="유저가 정하는 job 이름. DNS-1035 label(영문 소문자로 시작, 1~63자), 삭제되지 않은 job끼리 유저별 유일. 생성되는 리소스 이름으로 쓰인다"
+    )
+    template: JobTemplate = Field(
+        description="유저가 보낸 템플릿 입력(기본값이 채워진 상태)"
     )
     resources: list[JobResource] = Field(
-        description="구성 리소스. 1개 이상, 모두 namespace에 속한다"
+        description="템플릿으로 서버가 생성한 리소스. 1개 이상, 모두 namespace에 속한다"
+    )
+    quota_slot: int = Field(
+        description="개수 한도용 슬롯 번호 0~MAX_JOBS_PER_USER-1. 저장 시 서버가 빈 슬롯을 고른다"
     )
     status: JobStatus = Field(
         description="operator가 클러스터를 관찰해 갱신하는 상태. 생성 시 pending"

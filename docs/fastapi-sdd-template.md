@@ -108,6 +108,7 @@ tar -cf - docs/fastapi-sdd-template.md sdd-process.md .claude/skills/feat .claud
 - lint·포맷은 `ruff`만 쓴다(`black`/`flake8`/`isort` 금지).
 - 타입 힌트 필수. 모든 public 함수는 return type을 명시한다.
 - 함수/변수는 snake_case.
+- 검증 함수 이름: 틀리면 예외를 던지는 함수는 `validate_<대상>`(예: `validate_user_id`), 참/거짓만 돌려주는 함수는 `is_<대상>`(예: `is_user_id`).
 - 모든 함수와 복잡한 로직에는 짧지만 빠른 이해에 도움이 되는 주석을 단다.
 - `models/`·`schemas/`의 Pydantic 필드에는 `Field(description=...)`로 설명을 단다(의미, 형식·제약, 누가 값을 정하는지). `schemas/`의 설명은 `/docs`에 그대로 노출된다.
 
@@ -148,6 +149,17 @@ def test_openapi_docs() -> None:
 
 - 외부 시스템 클라이언트는 `services/<name>_service.py`의 클래스 하나로 감싸고, 다른 service는 그 클래스를 통해서만 호출한다.
 - 라우터가 없는 백그라운드 컴포넌트(watch, 스케줄러 등)도 DB는 `repository/`, 외부 시스템은 래퍼 클래스를 통해서만 접근한다.
+
+## API 문서 (OpenAPI)
+`/docs`(Swagger UI)와 `/redoc`(ReDoc)에서 요청·응답이 실제 값으로 보이게 한다. 스키마만 두면 ReDoc이 `"string"`, `0` 같은 의미 없는 샘플을 만든다.
+- **요청 body**: `Body(openapi_examples={...})`로 대표 입력을 이름 붙여 둔다(예: 필수 필드만, 모든 필드).
+- **헤더·쿼리 파라미터**: `Header(...)`·`Query(...)`에도 `openapi_examples`를 둔다.
+- **정상 응답**: `responses={<상태 코드>: {"content": {"application/json": {"example": ...}}}}`.
+- **에러 응답**: 엔드포인트마다 나열하지 않는다. `schemas/error.py`에 400·500(필요하면 404) 응답 문서(`ErrorResponse` 모양 + 대표 example 하나)를 두고 `APIRouter(responses=...)`로 라우터마다 한 번만 붙인다.
+  - 엔드포인트별 에러 code 목록의 기준은 `docs/<feature-name>/spec.md`의 에러 표다. `/docs`에는 엔드포인트 `description`에 그 경로만 적는다(같은 목록을 코드·테스트에 다시 쓰지 않는다).
+  - 전역 핸들러의 500 본문은 핸들러와 문서가 같은 상수를 쓴다.
+- example 값은 `schemas/<name>.py`에 상수로 두고 라우터가 연결만 한다.
+- **테스트로 어긋남을 막는다**: 요청 example을 실제로 보내 정상 응답이 나는지, 응답 example이 응답 schema로 검증되는지 확인한다.
 
 ## Error Handling
 - 모든 비즈니스 에러는 `MyApiError(ErrorEnum.XXX)`로 던진다. `ErrorEnum` 각 항목은 `(code, status_code, message)`를 가진다.
