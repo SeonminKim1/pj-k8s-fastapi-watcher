@@ -19,9 +19,15 @@ from src.services.job_templates import build_resources
 
 
 # 유저 ID 형식이 틀리면 INVALID_USER_ID(400). owner_id를 받는 모든 메서드의 첫 검사다.
-def _require_user_id(owner_id: Any) -> None:
+def _validate_user_id(owner_id: Any) -> None:
     if not is_user_id(owner_id):
         raise MyApiError(ErrorEnum.INVALID_USER_ID)
+
+
+# job 이름이 DNS-1035 label이 아니면 INVALID_JOB_NAME(400).
+def _validate_job_name(name: Any) -> None:
+    if not is_dns_1035_label(name):
+        raise MyApiError(ErrorEnum.INVALID_JOB_NAME)
 
 
 class UserJobService:
@@ -37,9 +43,8 @@ class UserJobService:
     async def create_job(
         self, owner_id: str, name: str, template: JobTemplate
     ) -> UserJob:
-        _require_user_id(owner_id)
-        if not is_dns_1035_label(name):
-            raise MyApiError(ErrorEnum.INVALID_JOB_NAME)
+        _validate_user_id(owner_id)
+        _validate_job_name(name)
         namespace = f"user-{owner_id}"
         resources = build_resources(name, namespace, template)
         now = datetime.now(UTC)
@@ -64,12 +69,12 @@ class UserJobService:
 
     # 삭제되지 않은 자기 job을 최신순으로 반환한다.
     async def list_jobs(self, owner_id: str) -> list[UserJob]:
-        _require_user_id(owner_id)
+        _validate_user_id(owner_id)
         return await self.repository.find_active_by_owner(owner_id)
 
     # 자기 job 하나를 반환한다. 유저 ID 형식 오류는 INVALID_USER_ID, 남의 job·없음·삭제됨·잘못된 ID는 모두 JOB_NOT_FOUND.
     async def get_job(self, owner_id: str, job_id: str) -> UserJob:
-        _require_user_id(owner_id)
+        _validate_user_id(owner_id)
         job = await self.repository.find_active_by_id(job_id)
         if job is None or job.owner_id != owner_id:
             raise MyApiError(ErrorEnum.JOB_NOT_FOUND)
@@ -96,7 +101,7 @@ class UserJobService:
 
     # 자기 job을 soft delete한다. 클러스터 리소스 정리는 operator가 한다.
     async def delete_job(self, owner_id: str, job_id: str) -> None:
-        _require_user_id(owner_id)
+        _validate_user_id(owner_id)
         deleted = await self.repository.soft_delete(owner_id, job_id, datetime.now(UTC))
         if not deleted:
             raise MyApiError(ErrorEnum.JOB_NOT_FOUND)

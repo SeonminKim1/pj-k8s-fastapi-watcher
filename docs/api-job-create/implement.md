@@ -92,3 +92,8 @@
 - `src/routers/job_router.py`: `APIRouter(responses=COMMON_ERROR_RESPONSES)`, 엔드포인트에는 201 example과 `description`(에러 code는 spec 경로)만. 요청·헤더·201 example은 그대로.
 - 테스트: code별 에러 example 목록 테스트 → 400·500 모양·대표 example·spec 경로 확인으로. 500 본문 = 핸들러 응답 테스트는 유지.
 - 규칙: `docs/fastapi-sdd-template.md` "API 문서 (OpenAPI)"의 에러 응답 항목, `sdd-process.md` 완료 체크리스트, `CLAUDE.md` 고유 구성.
+
+## 변경: 2026-10-30 검증 함수 이름
+- `src/services/user_job_service.py`: `_require_user_id` → `_validate_user_id`. `create_job` 안에 있던 이름 검사를 `_validate_job_name`으로 분리. 동작 변화 없음.
+- `docs/fastapi-sdd-template.md` Python 규칙: 예외를 던지는 검증 함수는 `validate_<대상>`, bool을 돌려주는 함수는 `is_<대상>`.
+- 확인: ruff 통과, pytest 219 passed.
