@@ -150,13 +150,15 @@ def test_openapi_docs() -> None:
 - 라우터가 없는 백그라운드 컴포넌트(watch, 스케줄러 등)도 DB는 `repository/`, 외부 시스템은 래퍼 클래스를 통해서만 접근한다.
 
 ## API 문서 (OpenAPI)
-`/docs`(Swagger UI)와 `/redoc`(ReDoc)이 API 문서의 기준이다. 스키마만 두면 ReDoc이 `"string"`, `0` 같은 의미 없는 샘플을 만들고, 에러는 `{code, message}` 모양만 보이므로 example을 직접 둔다.
+`/docs`(Swagger UI)와 `/redoc`(ReDoc)에서 요청·응답이 실제 값으로 보이게 한다. 스키마만 두면 ReDoc이 `"string"`, `0` 같은 의미 없는 샘플을 만든다.
 - **요청 body**: `Body(openapi_examples={...})`로 대표 입력을 이름 붙여 둔다(예: 필수 필드만, 모든 필드).
 - **헤더·쿼리 파라미터**: `Header(...)`·`Query(...)`에도 `openapi_examples`를 둔다.
 - **정상 응답**: `responses={<상태 코드>: {"content": {"application/json": {"example": ...}}}}`.
-- **에러 응답**: 엔드포인트가 낼 수 있는 `ErrorEnum`을 상태 코드별로 **모두** example로 둔다(code마다 하나). 값은 `ErrorEnum`에서 만들어 실제 메시지와 어긋나지 않게 하고(`schemas/error.py`의 공용 함수), 전역 핸들러의 500 에러도 핸들러와 같은 상수를 쓴다.
+- **에러 응답**: 엔드포인트마다 나열하지 않는다. `schemas/error.py`에 400·500(필요하면 404) 응답 문서(`ErrorResponse` 모양 + 대표 example 하나)를 두고 `APIRouter(responses=...)`로 라우터마다 한 번만 붙인다.
+  - 엔드포인트별 에러 code 목록의 기준은 `docs/<feature-name>/spec.md`의 에러 표다. `/docs`에는 엔드포인트 `description`에 그 경로만 적는다(같은 목록을 코드·테스트에 다시 쓰지 않는다).
+  - 전역 핸들러의 500 본문은 핸들러와 문서가 같은 상수를 쓴다.
 - example 값은 `schemas/<name>.py`에 상수로 두고 라우터가 연결만 한다.
-- **테스트로 어긋남을 막는다**: 요청 example을 실제로 보내 정상 응답이 나는지, 응답 example이 응답 schema로 검증되는지, 에러 example이 엔드포인트의 에러 목록과 같은지 확인한다.
+- **테스트로 어긋남을 막는다**: 요청 example을 실제로 보내 정상 응답이 나는지, 응답 example이 응답 schema로 검증되는지 확인한다.
 
 ## Error Handling
 - 모든 비즈니스 에러는 `MyApiError(ErrorEnum.XXX)`로 던진다. `ErrorEnum` 각 항목은 `(code, status_code, message)`를 가진다.

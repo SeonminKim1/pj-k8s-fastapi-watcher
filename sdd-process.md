@@ -251,7 +251,7 @@
 - [ ] `uv run ruff check .` / `uv run ruff format .` 통과
 - [ ] 레이어 규칙 준수 (Router → Service → Repository, 비즈니스 에러는 `MyApiError`)
 - [ ] spec의 정상 케이스와 에러 케이스를 `/docs`에서 직접 호출해 확인
-- [ ] `/redoc`에서 요청·응답·에러 example이 실제 값으로 보이는지 확인 (`docs/fastapi-sdd-template.md`의 "API 문서 (OpenAPI)")
+- [ ] `/redoc`에서 요청·응답 example이 실제 값으로 보이는지 확인 (`docs/fastapi-sdd-template.md`의 "API 문서 (OpenAPI)")
 - [ ] `uv run pytest` 통과 (비즈니스 규칙마다 service 테스트 존재)
 - [ ] README 등 관련 문서 갱신
 - [ ] task.md 체크리스트 모두 완료

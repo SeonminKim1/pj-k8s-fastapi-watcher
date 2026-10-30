@@ -254,30 +254,12 @@ def test_openapi_response_example_is_valid(service: FakeUserJobService) -> None:
     }
 
 
-# 에러 example은 code마다 하나이고, 이 엔드포인트가 낼 수 있는 에러를 모두 담는다.
-def test_openapi_error_examples() -> None:
-    responses = client.get("/openapi.json").json()["paths"]["/jobs"]["post"][
-        "responses"
-    ]
-
-    def examples(status: str) -> dict[str, Any]:
-        return responses[status]["content"]["application/json"]["examples"]
-
-    expected_400 = [
-        ErrorEnum.INVALID_USER_ID,
-        ErrorEnum.INVALID_PARAMETER,
-        ErrorEnum.INVALID_JOB_NAME,
-        ErrorEnum.INVALID_JOB_TYPE,
-        ErrorEnum.INVALID_IMAGE,
-        ErrorEnum.INVALID_PORT,
-        ErrorEnum.INVALID_REPLICAS,
-        ErrorEnum.INVALID_ENV,
-        ErrorEnum.INVALID_SIZE,
-        ErrorEnum.JOB_QUOTA_EXCEEDED,
-        ErrorEnum.JOB_NAME_DUPLICATED,
-    ]
-    assert {k: v["value"] for k, v in examples("400").items()} == {
-        e.code: {"code": e.code, "message": e.message} for e in expected_400
-    }
-    assert set(examples("500")) == {"db_error", "unknown_error"}
-    assert "example" in responses["201"]["content"]["application/json"]
+# 400·500은 라우터 공통 선언: ErrorResponse 모양과 대표 example. code 목록은 spec을 가리킨다.
+def test_openapi_error_responses() -> None:
+    op = client.get("/openapi.json").json()["paths"]["/jobs"]["post"]
+    for status in ("400", "500"):
+        content = op["responses"][status]["content"]["application/json"]
+        assert content["schema"] == {"$ref": "#/components/schemas/ErrorResponse"}
+        assert set(content["example"]) == {"code", "message"}
+    assert "spec.md" in op["description"]
+    assert "example" in op["responses"]["201"]["content"]["application/json"]

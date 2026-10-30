@@ -20,27 +20,24 @@ DB_ERROR = ErrorResponse(code="db_error", message="데이터베이스 오류가 
 UNKNOWN_ERROR = ErrorResponse(
     code="unknown_error", message="알 수 없는 오류가 발생했습니다."
 )
-SERVER_ERRORS: list[ErrorResponse] = [DB_ERROR, UNKNOWN_ERROR]
 
 
-# 에러 응답 목록을 OpenAPI media type examples로 바꾼다(code마다 example 하나, 이름은 code).
-def _examples(errors: list[ErrorResponse]) -> dict[str, dict[str, Any]]:
-    return {e.code: {"summary": e.code, "value": e.model_dump()} for e in errors}
-
-
-# 라우터 responses에 넣을 에러 응답 문서. 엔드포인트가 낼 수 있는 ErrorEnum을 상태 코드별로 묶어
-# /docs·/redoc에 code별 example로 보여 준다. 500(SERVER_ERRORS)은 모든 엔드포인트에 붙인다.
-def error_responses(*errors: ErrorEnum) -> dict[int | str, dict[str, Any]]:
-    by_status: dict[int, list[ErrorResponse]] = {}
-    for e in errors:
-        by_status.setdefault(e.status_code, []).append(
-            ErrorResponse(code=e.code, message=e.message)
-        )
-    by_status[500] = SERVER_ERRORS
+# 상태 코드 하나의 에러 응답 문서: 모양(ErrorResponse)과 대표 example 하나.
+def _error_doc(description: str, example: ErrorResponse) -> dict[str, Any]:
     return {
-        status: {
-            "model": ErrorResponse,
-            "content": {"application/json": {"examples": _examples(items)}},
-        }
-        for status, items in sorted(by_status.items())
+        "model": ErrorResponse,
+        "description": description,
+        "content": {"application/json": {"example": example.model_dump()}},
     }
+
+
+_BAD_REQUEST = ErrorEnum.INVALID_PARAMETER
+
+# 라우터 공통 에러 응답(APIRouter(responses=...)). 엔드포인트별 code 목록은 각 기능의 spec.md "에러 케이스"가 기준이다.
+COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    400: _error_doc(
+        "잘못된 요청·규칙 위반. code로 구분한다(목록은 엔드포인트 설명의 spec 참고)",
+        ErrorResponse(code=_BAD_REQUEST.code, message=_BAD_REQUEST.message),
+    ),
+    500: _error_doc("서버 내부 오류(db_error, unknown_error)", DB_ERROR),
+}

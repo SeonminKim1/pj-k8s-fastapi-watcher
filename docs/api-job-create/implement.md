@@ -85,3 +85,10 @@
 - `tests/test_validation_error.py`: 자체 `_Body` 대신 실제 `JobCreateRequest`로 검증. loc 형태 테스트(리뷰 6) 제거, `error_code` 단위 테스트 추가.
 - `CLAUDE.md`: "새 필드는 위치→에러 표에 추가" → "필드 타입에 `error_code` 붙이기".
 - 확인: ruff 통과, pytest 219 passed.
+
+## 변경: 2026-10-30 에러 응답 문서를 라우터 공통 선언으로
+엔드포인트마다 에러 code를 모두 example로 나열하면 같은 목록을 spec·라우터·테스트 세 곳에서 손으로 맞춰야 하고, 엔드포인트가 늘수록 커진다. 흔한 방식대로 줄였다.
+- `src/schemas/error.py`: `error_responses()`·`_examples()`·`SERVER_ERRORS` 제거. `COMMON_ERROR_RESPONSES`(400: `ErrorResponse` + `invalid_parameter` example, 500: `db_error` example) 추가.
+- `src/routers/job_router.py`: `APIRouter(responses=COMMON_ERROR_RESPONSES)`, 엔드포인트에는 201 example과 `description`(에러 code는 spec 경로)만. 요청·헤더·201 example은 그대로.
+- 테스트: code별 에러 example 목록 테스트 → 400·500 모양·대표 example·spec 경로 확인으로. 500 본문 = 핸들러 응답 테스트는 유지.
+- 규칙: `docs/fastapi-sdd-template.md` "API 문서 (OpenAPI)"의 에러 응답 항목, `sdd-process.md` 완료 체크리스트, `CLAUDE.md` 고유 구성.
