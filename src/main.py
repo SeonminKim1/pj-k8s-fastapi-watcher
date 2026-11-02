@@ -17,7 +17,7 @@ from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.core.exception.validation_error import to_error_enum
 from src.models.k8s_names import is_user_id
 from src.routers import job_router
-from src.schemas.error import DB_ERROR, UNKNOWN_ERROR
+from src.schemas.error_response import DB_ERROR, UNKNOWN_ERROR
 
 
 # 앱 시작 시 클러스터 설정을 읽고 컬렉션 인덱스를 만든다(이미 있으면 그대로).

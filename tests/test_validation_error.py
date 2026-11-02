@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from src.core.exception.my_exception import ErrorEnum
 from src.core.exception.validation_error import error_code, to_error_enum
-from src.schemas.job import JobCreateRequest
+from src.schemas.job_request import JobCreateRequest
 
 
 # body를 검증해 FastAPI처럼 loc 앞에 "body"를 붙인 에러 목록을 만든다.
