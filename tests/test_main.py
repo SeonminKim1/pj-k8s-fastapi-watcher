@@ -9,7 +9,7 @@ from pymongo.errors import PyMongoError
 from src import main
 from src.core import dependencies
 from src.main import app
-from src.schemas.error import DB_ERROR, UNKNOWN_ERROR
+from src.schemas.error_response import DB_ERROR, UNKNOWN_ERROR
 
 client = TestClient(app)
 

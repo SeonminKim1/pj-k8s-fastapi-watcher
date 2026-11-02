@@ -3,14 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends
 
 from src.core.dependencies import get_user_job_service
-from src.schemas.common import UserIdHeader
-from src.schemas.error import COMMON_ERROR_RESPONSES
-from src.schemas.job import (
-    JOB_CREATE_EXAMPLES,
-    JOB_RESPONSE_EXAMPLE,
-    JobCreateRequest,
-    JobResponse,
-)
+from src.schemas.common_request import UserIdHeader
+from src.schemas.error_response import COMMON_ERROR_RESPONSES
+from src.schemas.job_request import JOB_CREATE_EXAMPLES, JobCreateRequest
+from src.schemas.job_response import JOB_RESPONSE_EXAMPLE, JobResponse
 from src.services.user_job_service import UserJobService
 
 router = APIRouter(prefix="/jobs", tags=["jobs"], responses=COMMON_ERROR_RESPONSES)

@@ -10,7 +10,8 @@ from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.main import app
 from src.models.enums import JobStatus
 from src.models.user_job import UserJob, WebTemplate
-from src.schemas.job import JOB_CREATE_EXAMPLES, JOB_RESPONSE_EXAMPLE, JobResponse
+from src.schemas.job_request import JOB_CREATE_EXAMPLES
+from src.schemas.job_response import JOB_RESPONSE_EXAMPLE, JobResponse
 from src.services.job_templates import build_resources
 
 # lifespan을 타지 않도록 with 없이 쓴다(클러스터·MongoDB 불필요).

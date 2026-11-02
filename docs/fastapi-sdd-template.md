@@ -140,7 +140,7 @@ def test_openapi_docs() -> None:
 | 위치 | 역할 | 금지 |
 |---|---|---|
 | `src/routers/` | HTTP 계층만: 요청 파싱 → `services/` 함수 하나 호출 → 결과 반환 | 비즈니스 로직, `repository/`·외부 클라이언트 직접 호출, raw dict·`models/` 객체 반환 |
-| `src/schemas/` | 라우터의 요청/응답 Pydantic 모델. 리소스당 모듈 하나(`routers/<name>_router.py` ↔ `schemas/<name>.py`) | 라우터가 참조하는 모델은 이것뿐 |
+| `src/schemas/` | 라우터의 요청/응답 Pydantic 모델. 리소스당 요청·응답 모듈을 나눈다(`routers/<name>_router.py` ↔ `schemas/<name>_request.py`·`schemas/<name>_response.py`). 여러 라우터가 함께 쓰는 것은 `common_request.py`(공통 헤더 등)·`error_response.py`(에러 응답) | 라우터가 참조하는 모델은 이것뿐 |
 | `src/services/` | 비즈니스 로직(검증/변환). 영속화는 `repository/`로, 외부 클라이언트는 직접 호출. 도메인 객체 또는 완성된 응답 객체 반환 | `routers/` import |
 | `src/repository/` | DB 접근(쿼리/CRUD)만 | `routers/`·`services/` 호출 |
 | `src/models/` | 내부/도메인 모델, DB document 모델(`schemas/`와 구분) | |
@@ -155,10 +155,10 @@ def test_openapi_docs() -> None:
 - **요청 body**: `Body(openapi_examples={...})`로 대표 입력을 이름 붙여 둔다(예: 필수 필드만, 모든 필드).
 - **헤더·쿼리 파라미터**: `Header(...)`·`Query(...)`에도 `openapi_examples`를 둔다.
 - **정상 응답**: `responses={<상태 코드>: {"content": {"application/json": {"example": ...}}}}`.
-- **에러 응답**: 엔드포인트마다 나열하지 않는다. `schemas/error.py`에 400·500(필요하면 404) 응답 문서(`ErrorResponse` 모양 + 대표 example 하나)를 두고 `APIRouter(responses=...)`로 라우터마다 한 번만 붙인다.
+- **에러 응답**: 엔드포인트마다 나열하지 않는다. `schemas/error_response.py`에 400·500(필요하면 404) 응답 문서(`ErrorResponse` 모양 + 대표 example 하나)를 두고 `APIRouter(responses=...)`로 라우터마다 한 번만 붙인다.
   - 엔드포인트별 에러 code 목록의 기준은 `docs/<feature-name>/spec.md`의 에러 표다. `/docs`에는 엔드포인트 `description`에 그 경로만 적는다(같은 목록을 코드·테스트에 다시 쓰지 않는다).
   - 전역 핸들러의 500 본문은 핸들러와 문서가 같은 상수를 쓴다.
-- example 값은 `schemas/<name>.py`에 상수로 두고 라우터가 연결만 한다.
+- example 값은 해당 schema 모듈(요청 example은 `schemas/<name>_request.py`, 응답 example은 `schemas/<name>_response.py`)에 상수로 두고 라우터가 연결만 한다.
 - **테스트로 어긋남을 막는다**: 요청 example을 실제로 보내 정상 응답이 나는지, 응답 example이 응답 schema로 검증되는지 확인한다.
 
 ## Error Handling
