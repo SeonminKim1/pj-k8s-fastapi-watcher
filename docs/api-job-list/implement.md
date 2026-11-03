@@ -13,18 +13,22 @@
 - ■ 3단계 완료 — 다음: 4단계 T5
 - ▶ 4단계 (순차) T5 시작 — schemas, `GET /jobs` 라우터, router 테스트
 - ✔ T5 완료 — `schemas/job_request.py`(`JobListRequest`, `job_list_request()`), `schemas/job_response.py`(`JobSummary`, `JobListResponse`, example), `routers/job_router.py`(`GET /jobs`), `tests/test_job_router.py`(list 테스트 26개). pytest 279 passed. 헤더를 dependency로 옮김(아래 메모) (#23)
+- ■ 4단계 완료 — 다음: 5단계 T6
+- ▶ 5단계 (순차) T6 시작 — README, 완료 체크리스트, 실제 앱 확인
+- ✔ T6 완료 — README API 표에 `GET /jobs`. 로컬 MongoDB 임시 DB로 앱을 띄워 정상·에러 케이스 직접 호출(아래 메모), `/docs`·`/redoc` 200. ruff 통과, pytest 279 passed (#24)
+- ■ 5단계 완료 — 모든 작업 완료
 
 ## spec과 달라진 점
 - 없음
 
 ## 완료 체크리스트
-- [ ] `uv run ruff check .` / `uv run ruff format .` 통과
-- [ ] 레이어 규칙 준수 (Router → Service → Repository, 비즈니스 에러는 `MyApiError`)
-- [ ] spec의 정상 케이스와 에러 케이스를 `/docs`에서 직접 호출해 확인
-- [ ] `/redoc`에서 요청·응답 example이 실제 값으로 보이는지 확인 (`docs/fastapi-sdd-template.md`의 "API 문서 (OpenAPI)")
-- [ ] `uv run pytest` 통과 (비즈니스 규칙마다 service 테스트 존재)
-- [ ] README 등 관련 문서 갱신
-- [ ] task.md 체크리스트 모두 완료
+- [x] `uv run ruff check .` / `uv run ruff format .` 통과
+- [x] 레이어 규칙 준수 (Router → Service → Repository, 비즈니스 에러는 `MyApiError`)
+- [x] spec의 정상 케이스와 에러 케이스를 직접 호출해 확인 (`/docs` 대신 실행 중인 앱에 curl, 아래 메모)
+- [x] `/redoc`에서 요청·응답 example이 실제 값으로 보이는지 확인 (OpenAPI JSON의 examples로 확인. 브라우저로는 열어 보지 않음) (`docs/fastapi-sdd-template.md`의 "API 문서 (OpenAPI)")
+- [x] `uv run pytest` 통과 (279 passed, 비즈니스 규칙마다 service 테스트 존재)
+- [x] README 등 관련 문서 갱신
+- [x] task.md 체크리스트 모두 완료
 
 ## 메모
 - `encode_cursor(position: JobPosition)`: plan은 `encode_cursor(job: UserJob)`이었지만, `decode_cursor`와 같은 타입을 주고받게 해 왕복 테스트를 단순하게 했다. service가 마지막 항목으로 `JobPosition`을 만들어 넘긴다. 외부 동작은 같다.
@@ -39,3 +43,9 @@
 - T5 dependency 설계(plan의 `JobListQuery`·`job_list_query()` → `JobListRequest`·`job_list_request()`): FastAPI 0.162.0에서 직접 확인한 두 가지 때문에 바꿨다. 외부 동작은 spec 그대로다.
   1. FastAPI는 dependency를 엔드포인트 파라미터보다 먼저 실행한다. 헤더를 엔드포인트에 두면 헤더가 없어도 dependency의 `status` 중복 에러가 먼저 나가 spec 우선순위(헤더 1순위)가 깨진다. 헤더를 dependency 파라미터로 옮기면 헤더·limit·status 형식 에러가 있을 때 dependency 본문이 실행되지 않고, 모인 에러에서 우선순위대로 하나가 골라진다. 그래서 요청 모델에 `user_id`가 들어가 이름을 `JobListRequest`로 했다.
   2. `Query(ge=1, le=100)`에 둔 범위 제약은 `error_code()`의 감싸기 밖에서 적용돼 pydantic 기본 에러(`greater_than_equal`)가 나간다. `Annotated[int, Field(ge, le), error_code(...), Query(...)]`처럼 제약을 `error_code` 앞에 둬야 `invalid_limit`이 된다.
+- T6 실제 앱 확인(`MONGO_DB_NAME=tmp_api_job_list_e2e`, kubeconfig `minikube`, 확인 후 DB 삭제): `POST /jobs`로 alice 5개·bob 1개를 만든 뒤
+  - 기본 조회: `job4 … job0`, `next_cursor: null`(bob 제외)
+  - `limit=2`로 넘기기: `[job4 job3] [job2 job1] [job0]`, 마지막만 `null`
+  - `status=running`: `{"items": [], "next_cursor": null}`
+  - 400: `limit=0`·`limit=abc` → `invalid_limit`, `status=bad`·`status` 두 번 → `invalid_job_status`, `cursor=bad`·`cursor=` → `invalid_cursor`, 헤더 없음 + `status` 두 번 → `invalid_user_id`
+  - OpenAPI: 응답 200·400·500, 파라미터 4개에 examples. `value: None`인 "보내지 않음" example은 `value` 키 없이 나가 Swagger UI에서 빈 칸으로 보인다.

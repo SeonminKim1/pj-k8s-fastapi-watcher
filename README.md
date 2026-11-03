@@ -22,8 +22,9 @@ uv run uvicorn src.main:app --reload
 | Method | Path | 설명 |
 |---|---|---|
 | `POST` | `/jobs` | job 생성. `X-User-Id` 헤더 필수. 템플릿 입력(`web`)으로 서버가 Deployment·Service 매니페스트를 만들어 `pending`으로 저장(클러스터 반영은 operator). 유저당 10개 |
+| `GET` | `/jobs` | 삭제되지 않은 자기 job 요약(`id`·`name`·`status`·`created_at`)을 최신순으로 조회. `X-User-Id` 헤더 필수. 쿼리 `limit`(1~100, 기본 20), `cursor`(직전 응답의 `next_cursor`), `status`(하나만). 응답 `{items, next_cursor}` |
 
-- 에러 응답은 `{code, message}`이며 400·404·500만 쓴다. 요청 형식 오류는 필드별 `code`(`invalid_image`, `invalid_port` 등)로 구분한다. 상세: [docs/api-job-create/spec.md](docs/api-job-create/spec.md)
+- 에러 응답은 `{code, message}`이며 400·404·500만 쓴다. 요청 형식 오류는 필드별 `code`(`invalid_image`, `invalid_port` 등)로 구분한다. 상세: [docs/api-job-create/spec.md](docs/api-job-create/spec.md), [docs/api-job-list/spec.md](docs/api-job-list/spec.md)
 
 ## 개발
 ```bash
