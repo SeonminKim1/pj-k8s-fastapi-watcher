@@ -61,7 +61,7 @@ class JobListRequest(BaseModel):
     """GET /jobs 요청 값(헤더 + 쿼리). job_list_request()가 검증해서 만든다."""
 
     user_id: str = Field(description="X-User-Id 헤더의 유저 ID")
-    limit: int = Field(description="한 페이지 최대 개수 1~100")
+    limit: int = Field(description=f"한 페이지 최대 개수 1~{JOB_LIST_MAX_LIMIT}")
     cursor: str | None = Field(description="직전 응답의 next_cursor. 없으면 첫 페이지")
     status: JobStatus | None = Field(description="이 상태의 job만. 없으면 모든 상태")
 
@@ -72,10 +72,19 @@ JOB_LIST_CURSOR_EXAMPLE = (
 )
 
 
+# GET /jobs 쿼리 → 여러 번 지정됐을 때의 에러. 쿼리를 추가하면 여기에도 넣는다.
+_JOB_LIST_QUERY_ERRORS: dict[str, ErrorEnum] = {
+    "limit": ErrorEnum.INVALID_LIMIT,
+    "cursor": ErrorEnum.INVALID_CURSOR,
+    "status": ErrorEnum.INVALID_JOB_STATUS,
+}
+
+
 # GET /jobs의 헤더·쿼리를 검증해 JobListRequest로 만드는 dependency(docs/api-job-list/plan.md "status 중복 지정 검출").
-# - FastAPI는 같은 쿼리가 여러 번 오면 조용히 마지막 값을 쓰므로, status가 두 번 이상이면 직접 검증 에러를 낸다.
+# - FastAPI는 같은 쿼리가 여러 번 오면 조용히 마지막 값을 쓰므로, 쿼리가 두 번 이상이면 직접 그 필드의 검증 에러를 낸다.
+#   중복 검사는 함수 본문에서 하므로 다른 형식 에러가 없을 때만 돈다(spec "요청 검증 에러").
 # - 헤더를 엔드포인트가 아니라 여기서 받는 이유: FastAPI는 dependency를 엔드포인트 파라미터보다 먼저 실행한다.
-#   헤더가 엔드포인트에 있으면 헤더가 틀려도 이 함수의 status 중복 에러가 먼저 나가 우선순위(헤더 먼저)가 깨진다.
+#   헤더가 엔드포인트에 있으면 헤더가 틀려도 이 함수의 중복 에러가 먼저 나가 우선순위(헤더 먼저)가 깨진다.
 #   여기 두면 헤더·limit·status 형식 에러가 있을 때 이 함수 본문이 실행되지 않고 함께 모여 우선순위대로 하나가 골라진다.
 # - limit의 범위 제약(Field)은 error_code 앞에 둬야 범위 에러도 invalid_limit이 된다(Query에 두면 감싸지지 않는다).
 def job_list_request(
@@ -86,8 +95,10 @@ def job_list_request(
         Field(ge=1, le=JOB_LIST_MAX_LIMIT),
         error_code(ErrorEnum.INVALID_LIMIT),
         Query(
-            description="한 페이지에 돌려줄 최대 개수. 1~100, 기본 20",
-            openapi_examples={"default": {"summary": "기본값", "value": 20}},
+            description=f"한 페이지에 돌려줄 최대 개수. 1~{JOB_LIST_MAX_LIMIT}, 기본 {JOB_LIST_DEFAULT_LIMIT}",
+            openapi_examples={
+                "default": {"summary": "기본값", "value": JOB_LIST_DEFAULT_LIMIT}
+            },
         ),
     ] = JOB_LIST_DEFAULT_LIMIT,
     cursor: Annotated[
@@ -112,9 +123,11 @@ def job_list_request(
         ),
     ] = None,
 ) -> JobListRequest:
-    if len(request.query_params.getlist("status")) > 1:
-        error = ErrorEnum.INVALID_JOB_STATUS
-        raise RequestValidationError(
-            [{"type": error.code, "loc": ("query", "status"), "msg": error.message}]
-        )
+    repeated = [
+        {"type": error.code, "loc": ("query", name), "msg": error.message}
+        for name, error in _JOB_LIST_QUERY_ERRORS.items()
+        if len(request.query_params.getlist(name)) > 1
+    ]
+    if repeated:
+        raise RequestValidationError(repeated)
     return JobListRequest(user_id=user_id, limit=limit, cursor=cursor, status=status)

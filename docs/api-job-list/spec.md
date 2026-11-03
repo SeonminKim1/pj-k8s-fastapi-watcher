@@ -13,7 +13,9 @@
 |---|---|---|---|---|
 | `limit` | `int` | X | `20` | 1~100. 한 페이지에 돌려줄 최대 개수 |
 | `cursor` | `str` | X | 없음(첫 페이지) | 직전 응답의 `next_cursor`를 그대로 보낸다. 형식은 불투명(클라이언트가 해석·조립하지 않는다) |
-| `status` | `"pending" \| "running" \| "failed"` | X | 없음(모든 상태) | 한 번만 지정할 수 있다. `?status=running&status=failed`처럼 여러 번 지정하면 400 |
+| `status` | `"pending" \| "running" \| "failed"` | X | 없음(모든 상태) | 하나만. 여러 상태를 한 번에 거르지 않는다 |
+
+- 쿼리는 모두 한 번만 지정할 수 있다. `?status=running&status=failed`, `?limit=5&limit=100`처럼 같은 쿼리를 여러 번 보내면 그 필드의 에러로 400이다(FastAPI 기본 동작인 "마지막 값 사용"으로 조용히 넘기지 않는다).
 
 - 정의되지 않은 쿼리 파라미터는 무시한다(FastAPI 기본 동작). 게이트웨이·클라이언트가 붙이는 추가 쿼리에 깨지지 않게 하기 위함이다. 오타(`?stauts=running`)는 필터 없이 전체가 온다.
 - 값이 빈 문자열이면(`?limit=`, `?cursor=`, `?status=`) 그 필드의 형식 오류로 400이다.
@@ -82,13 +84,15 @@
 | 1 | `X-User-Id` 없음·형식 오류 | `INVALID_USER_ID` (`invalid_user_id`) | 유저 ID는 소문자·숫자·'-'로 된 1~58자여야 합니다. |
 | 2 | `limit` 정수 아님·1~100 밖·빈 값 | `INVALID_LIMIT` (`invalid_limit`) | limit은 1~100 사이의 정수여야 합니다. |
 | 3 | `status` 지원하지 않는 값·빈 값·여러 번 지정 | `INVALID_JOB_STATUS` (`invalid_job_status`) | status는 pending, running, failed 중 하나만 지정할 수 있습니다. |
+| 4 | `cursor` 여러 번 지정 | `INVALID_CURSOR` (`invalid_cursor`) | cursor가 올바르지 않습니다. 직전 응답의 next_cursor를 그대로 보내야 합니다. |
 
-- `_PRIORITY`(`src/core/exception/validation_error.py`)에서 `INVALID_LIMIT`·`INVALID_JOB_STATUS`는 `INVALID_PARAMETER` 뒤에 둔다. 이 API에는 body가 없어 `INVALID_PARAMETER`가 나올 일이 없으므로 위 순서가 그대로 적용된다.
+- `_PRIORITY`(`src/core/exception/validation_error.py`)에서 `INVALID_LIMIT`·`INVALID_JOB_STATUS`·`INVALID_CURSOR`는 `INVALID_PARAMETER` 뒤에 둔다. 이 API에는 body가 없어 `INVALID_PARAMETER`가 나올 일이 없으므로 위 순서가 그대로 적용된다.
+- "여러 번 지정" 검사는 헤더·값 형식 검사가 모두 통과한 뒤에 한다. 그래서 `?limit=5&limit=6&status=bad`는 표 순서와 달리 `invalid_job_status`다(중복된 `limit` 값 자체는 올바르므로). 둘 다 고쳐야 하는 요청이라 실사용에 영향은 없다.
 
 **비즈니스 에러** (service)
 | 상황 | `ErrorEnum` (`code`) | 상태 코드 |
 |---|---|---|
-| `cursor`를 풀 수 없음(빈 값, 인코딩·형식 오류, 조작된 값) | `INVALID_CURSOR` (`invalid_cursor`) | 400 |
+| `cursor`를 풀 수 없음(빈 값, base64url이 아님, 형식 오류, 조작된 값, UTC로 바꾸면 날짜 범위를 벗어나는 시각) | `INVALID_CURSOR` (`invalid_cursor`) | 400 |
 
 - message 예: "cursor가 올바르지 않습니다. 직전 응답의 next_cursor를 그대로 보내야 합니다."
 - cursor 검사는 service에서 하므로 요청 검증 에러(위 표)가 있으면 그쪽이 먼저 나온다.

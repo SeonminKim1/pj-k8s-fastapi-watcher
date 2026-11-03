@@ -24,6 +24,7 @@ _PRIORITY: tuple[ErrorEnum, ...] = (
     # GET /jobs 쿼리. body가 없는 API라 위 body 에러와 함께 나오지 않는다.
     ErrorEnum.INVALID_LIMIT,
     ErrorEnum.INVALID_JOB_STATUS,
+    ErrorEnum.INVALID_CURSOR,  # cursor 중복 지정만. 디코딩 실패는 service가 던진다.
 )
 
 _BY_CODE: dict[str, ErrorEnum] = {e.code: e for e in ErrorEnum}

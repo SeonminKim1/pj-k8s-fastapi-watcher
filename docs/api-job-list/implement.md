@@ -49,3 +49,18 @@
   - `status=running`: `{"items": [], "next_cursor": null}`
   - 400: `limit=0`·`limit=abc` → `invalid_limit`, `status=bad`·`status` 두 번 → `invalid_job_status`, `cursor=bad`·`cursor=` → `invalid_cursor`, 헤더 없음 + `status` 두 번 → `invalid_user_id`
   - OpenAPI: 응답 200·400·500, 파라미터 4개에 examples. `value: None`인 "보내지 않음" example은 `value` 키 없이 나가 Swagger UI에서 빈 칸으로 보인다.
+
+## 변경: 2026-11-03 코드 리뷰 반영
+`/code-review` 지적 7건 중 4건을 반영하고 1건은 규칙으로 명시, 2건은 보류했다.
+- 반영
+  1. **(버그) 범위 밖 시각 cursor가 500**: `0001-01-01T00:00:00+14:00`처럼 UTC로 바꾸면 1년 이전이 되는 시각을 담은 cursor가 디코딩을 통과하고, MongoDB 쿼리 인코딩에서 `OverflowError`가 나서 500(`unknown_error`)이 됐다. 재현을 확인했다. `decode_cursor`가 시각을 UTC로 맞추고 `OverflowError`를 `INVALID_CURSOR`로 바꾼다. 테스트 2개 추가
+  2. **`limit`·`cursor` 중복 지정**: `status`만 막고 있어 `?limit=5&limit=100`이 조용히 마지막 값으로 처리됐다. 세 쿼리 모두 중복이면 그 필드의 에러(cursor는 `invalid_cursor`, `_PRIORITY`에 추가). spec 수정, router 테스트 4개 추가
+  3. **표준 base64 문자 허용**: `b64decode(altchars=b"-_", validate=True)`가 `+`·`/`도 받아 줬다(`+/+/` 디코딩 확인). 디코딩 전에 base64url 정규식으로 거른다. 테스트 2개 추가
+  6. **설명에 박힌 숫자**: `limit` 범위·기본값 설명을 상수로 만든다. `ErrorEnum.INVALID_LIMIT` 메시지는 enum 값이라 그대로 두고 상수 옆에 "상한을 바꾸면 메시지도 고친다" 주석
+- 규칙으로 명시
+  7. **`schemas/`에 dependency**: 라우터는 "파싱 → service 호출"만 하고 `UserIdHeader`처럼 요청 파싱 타입은 이미 `schemas/`에 있어 위치는 유지했다. `docs/fastapi-sdd-template.md` schemas 행에 "모델만으로 검증할 수 없는 요청 파싱은 요청 모듈에 dependency로" 한 줄 추가
+- 보류
+  4. **목록 인덱스**: 실제 실행 계획은 `uniq_owner_name`(`is_deleted: false` partial)을 써서 삭제된 job은 훑지 않는다(T3 확인). 메모리 정렬 대상은 유저당 최대 10개. 한도를 늘릴 때 partial `{owner_id: 1, created_at: -1, _id: -1}` 인덱스를 추가한다
+  5. **service·schema의 `limit` 이중 검사**: `owner_id`·`name`과 같은 "schema를 거치지 않는 호출자 대비" 패턴이고 같은 상수를 쓰므로 어긋나지 않는다
+- 확인: ruff 통과, pytest 287 passed
+

@@ -361,6 +361,8 @@ def test_list_jobs_passes_query(
         (HEADERS, "?status=running,failed", ErrorEnum.INVALID_JOB_STATUS),
         (HEADERS, "?status=running&status=failed", ErrorEnum.INVALID_JOB_STATUS),
         (HEADERS, "?status=running&status=running", ErrorEnum.INVALID_JOB_STATUS),
+        (HEADERS, "?limit=5&limit=100", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?cursor=a&cursor=b", ErrorEnum.INVALID_CURSOR),
     ],
 )
 def test_list_jobs_validation_errors(
@@ -381,6 +383,13 @@ def test_list_jobs_validation_errors(
         ({}, "?limit=0&status=bad", ErrorEnum.INVALID_USER_ID),
         (HEADERS, "?limit=0&status=running&status=failed", ErrorEnum.INVALID_LIMIT),
         (HEADERS, "?limit=abc&status=bad", ErrorEnum.INVALID_LIMIT),
+        # 중복끼리는 limit > status > cursor
+        (
+            HEADERS,
+            "?cursor=a&cursor=b&status=running&status=failed",
+            ErrorEnum.INVALID_JOB_STATUS,
+        ),
+        (HEADERS, "?cursor=a&cursor=b&limit=1&limit=2", ErrorEnum.INVALID_LIMIT),
     ],
 )
 def test_list_jobs_validation_priority(

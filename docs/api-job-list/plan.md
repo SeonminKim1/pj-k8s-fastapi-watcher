@@ -44,3 +44,11 @@
 - **repository는 자동 테스트가 없다**(테스트 규칙). `$or` 위치 조건과 `(created_at, _id)` 정렬이 실제 MongoDB에서 맞게 동작하는지, 같은 `created_at`을 가진 문서가 페이지 사이에서 빠지거나 겹치지 않는지 로컬 MongoDB 임시 DB로 확인하고 `implement.md`에 남긴다. 확인용 스크립트는 scratchpad에 두고 확인 후 지운다.
 - **MongoDB 시각 정밀도**: MongoDB는 밀리초까지만 저장한다. cursor는 항상 DB에서 읽은 값으로 만들므로 왕복이 정확하다. 단, 가짜 repository는 마이크로초 값을 가지므로 service 테스트도 그대로 통과한다(정밀도와 무관하게 같은 값을 비교).
 - **기존 기능 영향**: `UserJobService.list_jobs`·`find_active_by_owner`의 시그니처가 바뀐다. 아직 라우터·operator에서 쓰는 곳이 없어 service 테스트만 고치면 된다.
+
+## 변경: 2026-11-03 코드 리뷰 반영
+- `src/services/job_cursor.py`: 디코딩 전에 base64url 문자만 허용(정규식). 시각을 UTC로 맞추고, 범위를 벗어나면(`OverflowError`) `INVALID_CURSOR`
+- `src/schemas/job_request.py`: 중복 검사를 `status`에서 모든 쿼리(`limit`·`cursor`·`status`)로 넓힘(`_JOB_LIST_QUERY_ERRORS`). `limit` 설명을 상수로 만듦
+- `src/core/exception/validation_error.py`: `_PRIORITY` 끝에 `INVALID_CURSOR`(cursor 중복 지정용)
+- `docs/fastapi-sdd-template.md`: `schemas/`에 요청 파싱 dependency를 둔다는 규칙 한 줄
+- 하지 않음: 인덱스 변경, service의 `limit` 검사 제거, dependency 위치 이동(이유는 `implement.md`)
+

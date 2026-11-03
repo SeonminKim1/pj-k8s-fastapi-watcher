@@ -140,7 +140,7 @@ def test_openapi_docs() -> None:
 | 위치 | 역할 | 금지 |
 |---|---|---|
 | `src/routers/` | HTTP 계층만: 요청 파싱 → `services/` 함수 하나 호출 → 결과 반환 | 비즈니스 로직, `repository/`·외부 클라이언트 직접 호출, raw dict·`models/` 객체 반환 |
-| `src/schemas/` | 라우터의 요청/응답 Pydantic 모델. 리소스당 요청·응답 모듈을 나눈다(`routers/<name>_router.py` ↔ `schemas/<name>_request.py`·`schemas/<name>_response.py`). 여러 라우터가 함께 쓰는 것은 `common_request.py`(공통 헤더 등)·`error_response.py`(에러 응답) | 라우터가 참조하는 모델은 이것뿐 |
+| `src/schemas/` | 라우터의 요청/응답 Pydantic 모델. 리소스당 요청·응답 모듈을 나눈다(`routers/<name>_router.py` ↔ `schemas/<name>_request.py`·`schemas/<name>_response.py`). 여러 라우터가 함께 쓰는 것은 `common_request.py`(공통 헤더 등)·`error_response.py`(에러 응답). 모델만으로 검증할 수 없는 요청 파싱(예: 같은 쿼리 중복 지정 거절)은 그 요청 모듈에 dependency 함수로 두고, 결과를 요청 모델로 돌려준다 | 라우터가 참조하는 모델은 이것뿐 |
 | `src/services/` | 비즈니스 로직(검증/변환). 영속화는 `repository/`로, 외부 클라이언트는 직접 호출. 도메인 객체 또는 완성된 응답 객체 반환 | `routers/` import |
 | `src/repository/` | DB 접근(쿼리/CRUD)만 | `routers/`·`services/` 호출 |
 | `src/models/` | 내부/도메인 모델, DB document 모델(`schemas/`와 구분) | |
