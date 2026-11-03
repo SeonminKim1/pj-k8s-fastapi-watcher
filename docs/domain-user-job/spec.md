@@ -49,7 +49,7 @@
 **인덱스**
 - `(owner_id, name)` 유니크, `partialFilterExpression: {is_deleted: false}`. 삭제되지 않은 job끼리만 이름 중복을 막는다. 삭제된 job의 이름은 다시 쓸 수 있다.
 - `(owner_id, quota_slot)` 유니크, `partialFilterExpression: {is_deleted: false}`. 개수 한도(아래)를 동시 요청에서도 지킨다
-- `(owner_id, created_at desc)`: 유저별 목록 조회용(cursor 페이지네이션에 맞춘 인덱스 조정은 `api-job-list`에서 정한다)
+- 유저별 목록 조회용 인덱스(정렬 `created_at` 내림차순·`id` 내림차순, cursor·`status` 필터에 맞춘 구성은 `docs/api-job-list/plan.md`)
 
 **기존 데이터**: `template` 필드가 없는 문서는 마이그레이션하지 않는다(운영 데이터 없음). 개발 DB에 남아 있으면 지운다.
 
@@ -95,9 +95,11 @@
    3. `namespace=user-{owner_id}`, `status=pending`, `is_deleted=false`, `created_at=updated_at=now`, `deleted_at=None`, 빈 `quota_slot`으로 저장
    4. 빈 슬롯이 없으면 `JOB_QUOTA_EXCEEDED`
    5. 이름 유니크 인덱스 위반(동시 요청 포함)이면 `JOB_NAME_DUPLICATED`. 저장이 안 됐으므로 슬롯도 차지하지 않는다
-2. **`list_jobs(owner_id, limit, cursor) -> (list[UserJob], next_cursor)`**: `owner_id`가 유저 ID 형식이 아니면 `INVALID_USER_ID`. 삭제되지 않은 자기 job을 최신순(`created_at` 내림차순, 같으면 `id` 내림차순)으로 `limit`개 반환한다. cursor 페이지네이션
-   - `cursor`는 직전 페이지 마지막 항목을 가리키는 불투명 문자열. 없으면 첫 페이지. 다음 페이지가 없으면 `next_cursor=None`. 없으면 빈 목록
-   - `limit`의 기본값·상한, cursor 인코딩, 잘못된 cursor의 에러는 `api-job-list`에서 정하고 그때 구현한다(현재 코드는 cursor 없이 전체 반환)
+2. **`list_jobs(owner_id, limit, cursor, status) -> JobPage(items, next_cursor)`**: 삭제되지 않은 자기 job을 최신순(`created_at` 내림차순, 같으면 `id` 내림차순)으로 최대 `limit`개 반환한다. cursor 페이지네이션. 상세는 `docs/api-job-list/spec.md`
+   1. `owner_id` 형식 오류는 `INVALID_USER_ID`, `limit`이 1~100 밖이면 `INVALID_LIMIT`
+   2. `cursor`는 직전 페이지 마지막 항목의 위치 `(created_at, id)`를 담은 불투명 문자열. `None`이면 첫 페이지. 풀 수 없으면 `INVALID_CURSOR`. 위치만 쓰므로 가리키던 job이 삭제돼도 이어진다
+   3. `status`가 있으면 그 상태의 job만(하나만 지정)
+   4. 다음 페이지에 항목이 있을 때만 `next_cursor`, 아니면 `None`. 결과가 없으면 빈 목록
 3. **`get_job(owner_id, job_id) -> UserJob`**: `owner_id` 형식 오류는 `INVALID_USER_ID`. 자기 job이 아니거나, 없거나, 삭제됐거나, `job_id`가 ObjectId 형식이 아니면 모두 `JOB_NOT_FOUND`(다른 유저 job의 존재를 드러내지 않음)
 4. **`update_job_status(job_id, status) -> UserJob`**: operator 전용이라 소유자 확인 없음
    1. 전이 표에서 목표 `status`로 갈 수 있는 이전 상태 목록을 구하고, "현재 상태가 그 목록 중 하나일 때만" 조건부 갱신(`status: {$in: [...]}`) 한 번으로 원자적으로 바꾸고 `updated_at` 갱신. 재시도하지 않는다
@@ -122,6 +124,8 @@
 | job 이름 형식 오류 | `INVALID_JOB_NAME` (`invalid_job_name`) | 400 |
 | 삭제되지 않은 job이 이미 10개 | `JOB_QUOTA_EXCEEDED` (`job_quota_exceeded`) | 400 |
 | 삭제되지 않은 job 중 같은 이름 존재 | `JOB_NAME_DUPLICATED` (`job_name_duplicated`) | 400 |
+| 목록 `limit`이 1~100 밖 | `INVALID_LIMIT` (`invalid_limit`) | 400 |
+| 목록 `cursor`를 풀 수 없음 | `INVALID_CURSOR` (`invalid_cursor`) | 400 |
 | 허용되지 않는 상태 전이 | `INVALID_STATUS_TRANSITION` (`invalid_status_transition`) | 400 |
 | job 없음·다른 유저 job·삭제됨·잘못된 ID | `JOB_NOT_FOUND` (`job_not_found`) | 404 |
 | MongoDB 오류 | (전역 핸들러) `db_error` | 500 |

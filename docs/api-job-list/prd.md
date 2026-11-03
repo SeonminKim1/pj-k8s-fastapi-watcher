@@ -1,0 +1,23 @@
+# PRD: job 목록 조회 API
+- **배경/목적**: 유저는 job 생성 API(`docs/api-job-create/`)로 job을 등록할 수 있지만, 등록한 job과 그 진행 상황(`status`)을 다시 볼 방법이 없다. 생성 응답의 job ID를 잃어버리면 자기 job을 찾을 수 없고, operator가 바꾼 `status`(`pending` → `running`/`failed`)도 확인할 수 없다(`CLAUDE.md`의 "operator 패턴": 유저는 job `status`로 진행 상황을 본다).
+- **대상 사용자**: 게이트웨이를 거쳐 들어오는 서비스 유저(`X-User-Id`로 식별)
+- **하는 일**: 유저가 자기 job 목록을 요청하면, 삭제되지 않은 자기 job을 최신순으로 돌려준다. 각 항목은 목록 확인용 요약(job ID, 이름, 상태, 생성 시각 등)만 담고, 템플릿·리소스 같은 상세는 담지 않는다. 결과는 cursor 방식으로 나눠 받을 수 있고, 상태(`status`)로 거를 수 있다. MongoDB만 읽고 클러스터는 조회하지 않는다.
+- **비즈니스 규칙/제약**:
+  - 유저 식별은 `CLAUDE.md`의 "유저 식별" 규칙(`X-User-Id`)을 따른다. 자기 job만 보이며, 다른 유저의 job은 목록에 나오지 않는다.
+  - 삭제된(soft delete) job은 목록에 나오지 않는다. (추정: `docs/domain-user-job/spec.md`의 `list_jobs`가 "삭제되지 않은 자기 job")
+  - 정렬은 최신순(`created_at` 내림차순, 같으면 `id` 내림차순)이다(`docs/domain-user-job/spec.md`의 `list_jobs`).
+  - cursor 페이지네이션: 직전 페이지의 마지막 항목을 가리키는 불투명 cursor로 다음 페이지를 요청한다. 페이지 크기의 기본값·상한, cursor 형식, 잘못된 cursor 처리는 SPEC에서 정한다. 유저당 job은 10개까지라(`CLAUDE.md`의 "유저별 job 개수 제한") 지금은 한 페이지로 끝나는 경우가 대부분이지만, 한도가 커져도 API 형태가 바뀌지 않게 처음부터 둔다.
+  - `status` 필터: 지정한 상태의 job만 돌려준다. 지정하지 않으면 모든 상태. 여러 상태를 한 번에 지정할 수 있는지는 SPEC에서 정한다.
+  - `status`는 operator가 마지막으로 기록한 값이다. API가 클러스터를 직접 조회해 최신 상태를 보장하지는 않는다(`CLAUDE.md`의 "operator 패턴").
+  - 에러 상태 코드는 `CLAUDE.md`의 "에러 상태 코드" 규칙(400/404/500)을 따른다. 요청 검증 에러도 400으로, 필드별 에러 `code`로 구분한다(`api-job-create`와 같은 방식).
+- **완료 기준**: 유저가 `X-User-Id`와 함께 목록을 요청하면 삭제되지 않은 자기 job의 요약이 최신순으로 돌아오고, `next_cursor`로 다음 페이지를 이어 받을 수 있으며, `status`를 지정하면 그 상태의 job만 돌아온다. 다른 유저의 job과 삭제된 job은 나오지 않는다. 잘못된 헤더·쿼리 값은 400으로 거절된다.
+- **범위 제외**:
+  - job 단건 상세 조회(템플릿·리소스 포함) → 이후 `api-job-get`
+  - job 삭제 → 이후 `api-job-delete`
+  - 삭제된 job 조회(이력 보기)
+  - 이름 검색, 생성 시각 범위 등 `status` 외 필터, 정렬 기준 변경
+  - 클러스터의 실시간 상태 조회(Pod 상태 등)
+  - 전체 개수(total count) 응답
+- **관련 요구사항**: `CLAUDE.md`의 "유저 식별", "유저별 job 개수 제한", "에러 상태 코드", "operator 패턴", "의존성 주입"
+  - `docs/domain-user-job/spec.md`: `list_jobs(owner_id, limit, cursor)`의 미정 항목(`limit` 기본값·상한, cursor 인코딩, 잘못된 cursor 에러)을 이 기능에서 정하고, `status` 필터 인자를 추가한다. SPEC 단계에서 domain spec도 함께 고친다. 목록 인덱스 `(owner_id, created_at desc)`를 cursor·필터에 맞게 조정할지는 PLAN에서 정한다.
+  - `docs/api-job-create/`: 요청 검증 에러 처리(`to_error_enum()`)와 에러 응답 형태를 그대로 따른다.
