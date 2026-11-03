@@ -6,7 +6,15 @@ import pytest
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.models.enums import JobStatus
-from src.models.user_job import MAX_JOBS_PER_USER, UserJob, WebTemplate
+from src.models.user_job import (
+    JOB_LIST_DEFAULT_LIMIT,
+    JOB_LIST_MAX_LIMIT,
+    MAX_JOBS_PER_USER,
+    JobPage,
+    JobPosition,
+    UserJob,
+    WebTemplate,
+)
 from src.repository.user_job_repository import (
     DuplicateJobNameError,
     JobQuotaExceededError,
@@ -24,6 +32,7 @@ class FakeUserJobRepository:
         self.interfere_once: JobStatus | None = None
         self.update_calls = 0
         self.max_slots_seen: int | None = None
+        self.page_limit_seen: int | None = None
 
     # 실제 repository처럼 빈 슬롯이 없으면 한도 초과, 그다음 이름 중복을 판단한다.
     async def insert_with_slot(
@@ -46,13 +55,32 @@ class FakeUserJobRepository:
         self.docs[job_id] = {**job_doc, "quota_slot": slot}
         return UserJob(id=job_id, **self.docs[job_id])
 
-    async def find_active_by_owner(self, owner_id: str) -> list[UserJob]:
-        jobs = [
-            UserJob(id=i, **d)
-            for i, d in self.docs.items()
-            if d["owner_id"] == owner_id and not d["is_deleted"]
-        ]
-        return sorted(jobs, key=lambda j: j.created_at, reverse=True)
+    # 실제 repository처럼 (created_at, id) 내림차순으로 정렬하고, after 위치보다 뒤인 것만 limit개 돌려준다.
+    # 가짜 id는 같은 길이의 hex라 문자열 비교가 ObjectId 비교와 같다.
+    async def find_active_page(
+        self,
+        owner_id: str,
+        status: JobStatus | None,
+        after: JobPosition | None,
+        limit: int,
+    ) -> list[UserJob]:
+        self.page_limit_seen = limit
+        jobs = sorted(
+            (
+                UserJob(id=i, **d)
+                for i, d in self.docs.items()
+                if d["owner_id"] == owner_id
+                and not d["is_deleted"]
+                and (status is None or d["status"] == status.value)
+            ),
+            key=lambda j: (j.created_at, j.id),
+            reverse=True,
+        )
+        if after is not None:
+            jobs = [
+                j for j in jobs if (j.created_at, j.id) < (after.created_at, after.id)
+            ]
+        return jobs[:limit]
 
     async def find_active_by_id(self, job_id: str) -> UserJob | None:
         d = self.docs.get(job_id)
@@ -173,7 +201,7 @@ async def test_create_job_name_max_length_ok(service: UserJobService) -> None:
     assert job.resources[0].name == "a" * 63
 
 
-# owner_id를 받는 조회·삭제도 유저 ID 형식이 틀리면 INVALID_USER_ID(400)
+# owner_id를 받는 조회·삭제도 유저 ID 형식이 틀리면 INVALID_USER_ID(400). list는 limit·cursor보다 먼저 검사한다.
 @pytest.mark.parametrize("method", ["list", "get", "delete"])
 @pytest.mark.parametrize("owner_id", ["", "Bad_User!"])
 async def test_invalid_owner_id_on_read_delete(
@@ -181,7 +209,7 @@ async def test_invalid_owner_id_on_read_delete(
 ) -> None:
     job = await service.create_job("alice", "my-app", web())
     calls = {
-        "list": lambda: service.list_jobs(owner_id),
+        "list": lambda: service.list_jobs(owner_id, limit=0, cursor="bad"),
         "get": lambda: service.get_job(owner_id, job.id),
         "delete": lambda: service.delete_job(owner_id, job.id),
     }
@@ -262,11 +290,118 @@ async def test_list_jobs_own_active_latest_first(service: UserJobService) -> Non
     deleted = await service.create_job("alice", "deleted", web())
     await service.create_job("bob", "other", web())
     await service.delete_job("alice", deleted.id)
-    assert [j.id for j in await service.list_jobs("alice")] == [second.id, first.id]
+    page = await service.list_jobs("alice")
+    assert [j.id for j in page.items] == [second.id, first.id]
+    assert page.next_cursor is None
 
 
 async def test_list_jobs_empty(service: UserJobService) -> None:
-    assert await service.list_jobs("alice") == []
+    assert await service.list_jobs("alice") == JobPage(items=[], next_cursor=None)
+
+
+# 다음 페이지가 있는지 보려고 repository에 limit + 1을 넘긴다. 기본 limit은 20.
+async def test_list_jobs_reads_one_more(
+    service: UserJobService, repo: FakeUserJobRepository
+) -> None:
+    await service.list_jobs("alice")
+    assert repo.page_limit_seen == JOB_LIST_DEFAULT_LIMIT + 1 == 21
+    await service.list_jobs("alice", limit=3)
+    assert repo.page_limit_seen == 4
+
+
+# next_cursor가 None이 될 때까지 이어 받아 페이지별 job 이름을 모은다.
+async def collect_pages(
+    service: UserJobService, limit: int, status: JobStatus | None = None
+) -> list[list[str]]:
+    pages, cursor = [], None
+    while True:
+        page = await service.list_jobs("alice", limit, cursor, status)
+        pages.append([j.name for j in page.items])
+        if page.next_cursor is None:
+            return pages
+        cursor = page.next_cursor
+
+
+# 끝 페이지까지 이어 받으면 빠짐·겹침 없이 최신순 전체와 같고, 마지막 페이지만 next_cursor가 None
+async def test_list_jobs_pages(service: UserJobService) -> None:
+    for i in range(5):
+        await service.create_job("alice", f"job{i}", web())
+    assert await collect_pages(service, 2) == [
+        ["job4", "job3"],
+        ["job2", "job1"],
+        ["job0"],
+    ]
+
+
+# 남은 개수가 정확히 limit이면 그 페이지에서 끝난다(빈 페이지로 가는 cursor를 주지 않는다)
+async def test_list_jobs_exact_multiple_of_limit(service: UserJobService) -> None:
+    for i in range(4):
+        await service.create_job("alice", f"job{i}", web())
+    assert await collect_pages(service, 2) == [["job3", "job2"], ["job1", "job0"]]
+    assert await collect_pages(service, 4) == [["job3", "job2", "job1", "job0"]]
+
+
+# created_at이 같으면 id 내림차순. 같은 시각 그룹이 페이지 경계에 걸려도 빠짐·겹침 없음
+async def test_list_jobs_same_created_at(
+    service: UserJobService, repo: FakeUserJobRepository
+) -> None:
+    jobs = [await service.create_job("alice", f"job{i}", web()) for i in range(3)]
+    for job in jobs:
+        repo.docs[job.id]["created_at"] = jobs[0].created_at
+    assert await collect_pages(service, 2) == [["job2", "job1"], ["job0"]]
+
+
+async def test_list_jobs_status_filter(service: UserJobService) -> None:
+    jobs = [await service.create_job("alice", f"job{i}", web()) for i in range(4)]
+    await service.update_job_status(jobs[1].id, JobStatus.RUNNING)
+    await service.update_job_status(jobs[3].id, JobStatus.RUNNING)
+    assert await collect_pages(service, 1, JobStatus.RUNNING) == [["job3"], ["job1"]]
+    assert await collect_pages(service, 10, JobStatus.FAILED) == [[]]
+
+
+# cursor가 가리키던 job이 그사이 삭제돼도 그 위치 뒤가 이어진다
+async def test_list_jobs_cursor_job_deleted(service: UserJobService) -> None:
+    for i in range(3):
+        await service.create_job("alice", f"job{i}", web())
+    first = await service.list_jobs("alice", limit=1)
+    await service.delete_job("alice", first.items[0].id)
+    rest = await service.list_jobs("alice", limit=10, cursor=first.next_cursor)
+    assert [j.name for j in rest.items] == ["job1", "job0"]
+
+
+# 다른 유저 job 위치의 cursor를 보내도 자기 job만 나온다
+async def test_list_jobs_other_users_cursor(service: UserJobService) -> None:
+    await service.create_job("alice", "mine", web())
+    await service.create_job("bob", "b0", web())
+    await service.create_job("bob", "b1", web())
+    bob_cursor = (await service.list_jobs("bob", limit=1)).next_cursor
+    page = await service.list_jobs("alice", cursor=bob_cursor)
+    assert [j.name for j in page.items] == ["mine"]
+
+
+@pytest.mark.parametrize("limit", [1, JOB_LIST_MAX_LIMIT])
+async def test_list_jobs_limit_bounds_ok(service: UserJobService, limit: int) -> None:
+    await service.list_jobs("alice", limit=limit)
+
+
+@pytest.mark.parametrize("limit", [0, -1, JOB_LIST_MAX_LIMIT + 1, True, "20", None])
+async def test_list_jobs_invalid_limit(service: UserJobService, limit: Any) -> None:
+    with pytest.raises(MyApiError) as e:
+        await service.list_jobs("alice", limit=limit)
+    assert_error(e, ErrorEnum.INVALID_LIMIT)
+
+
+async def test_list_jobs_invalid_cursor(service: UserJobService) -> None:
+    with pytest.raises(MyApiError) as e:
+        await service.list_jobs("alice", cursor="not-a-cursor")
+    assert_error(e, ErrorEnum.INVALID_CURSOR)
+
+
+# 검사 순서: limit이 cursor보다 먼저
+async def test_list_jobs_limit_checked_before_cursor(service: UserJobService) -> None:
+    with pytest.raises(MyApiError) as e:
+        await service.list_jobs("alice", limit=0, cursor="not-a-cursor")
+    assert_error(e, ErrorEnum.INVALID_LIMIT)
 
 
 async def test_get_job(service: UserJobService) -> None:

@@ -6,7 +6,11 @@ from src.models.enums import JobStatus
 from src.models.k8s_names import is_dns_1035_label, is_user_id
 from src.models.user_job import (
     ALLOWED_STATUS_TRANSITIONS,
+    JOB_LIST_DEFAULT_LIMIT,
+    JOB_LIST_MAX_LIMIT,
     MAX_JOBS_PER_USER,
+    JobPage,
+    JobPosition,
     JobTemplate,
     UserJob,
 )
@@ -15,6 +19,7 @@ from src.repository.user_job_repository import (
     JobQuotaExceededError,
     UserJobRepository,
 )
+from src.services.job_cursor import decode_cursor, encode_cursor
 from src.services.job_templates import build_resources
 
 
@@ -28,6 +33,16 @@ def _validate_user_id(owner_id: Any) -> None:
 def _validate_job_name(name: Any) -> None:
     if not is_dns_1035_label(name):
         raise MyApiError(ErrorEnum.INVALID_JOB_NAME)
+
+
+# 목록 limit이 1~JOB_LIST_MAX_LIMIT 정수가 아니면 INVALID_LIMIT(400). bool은 int의 하위 타입이라 따로 막는다.
+def _validate_limit(limit: Any) -> None:
+    if (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not 1 <= limit <= JOB_LIST_MAX_LIMIT
+    ):
+        raise MyApiError(ErrorEnum.INVALID_LIMIT)
 
 
 class UserJobService:
@@ -67,10 +82,28 @@ class UserJobService:
         except DuplicateJobNameError as e:
             raise MyApiError(ErrorEnum.JOB_NAME_DUPLICATED) from e
 
-    # 삭제되지 않은 자기 job을 최신순으로 반환한다.
-    async def list_jobs(self, owner_id: str) -> list[UserJob]:
+    # 삭제되지 않은 자기 job을 최신순(created_at 내림차순, 같으면 id 내림차순)으로 최대 limit개 반환한다.
+    # cursor는 직전 페이지 마지막 항목의 위치이고, status가 있으면 그 상태만 돌려준다(docs/api-job-list/spec.md).
+    # limit + 1개를 읽어 다음 페이지에 항목이 실제로 있을 때만 next_cursor를 준다.
+    # 검사 순서: owner_id(INVALID_USER_ID) → limit(INVALID_LIMIT) → cursor(INVALID_CURSOR).
+    async def list_jobs(
+        self,
+        owner_id: str,
+        limit: int = JOB_LIST_DEFAULT_LIMIT,
+        cursor: str | None = None,
+        status: JobStatus | None = None,
+    ) -> JobPage:
         _validate_user_id(owner_id)
-        return await self.repository.find_active_by_owner(owner_id)
+        _validate_limit(limit)
+        after = decode_cursor(cursor) if cursor is not None else None
+        jobs = await self.repository.find_active_page(
+            owner_id, status, after, limit + 1
+        )
+        if len(jobs) <= limit:
+            return JobPage(items=jobs, next_cursor=None)
+        items = jobs[:limit]
+        last = JobPosition(created_at=items[-1].created_at, id=items[-1].id)
+        return JobPage(items=items, next_cursor=encode_cursor(last))
 
     # 자기 job 하나를 반환한다. 유저 ID 형식 오류는 INVALID_USER_ID, 남의 job·없음·삭제됨·잘못된 ID는 모두 JOB_NOT_FOUND.
     async def get_job(self, owner_id: str, job_id: str) -> UserJob:

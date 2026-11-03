@@ -7,6 +7,9 @@
 - ▶ 2단계 (병렬) T2, T3 시작 — cursor 인코딩 모듈, repository 위치 조회
 - ✔ T2 완료 — `services/job_cursor.py`, `tests/test_job_cursor.py`(왕복 3, 잘못된 cursor 11). pytest 236 passed. `encode_cursor` 인자를 plan의 `UserJob`에서 `JobPosition`으로 바꿈(아래 메모) (#20)
 - ✔ T3 완료 — `find_active_by_owner` → `find_active_page(owner_id, status, after, limit)`. 로컬 MongoDB 9.0.2 임시 DB에서 6개 항목 확인 후 DB 삭제(아래 메모). service는 T4까지 옛 메서드를 부르므로 이 커밋 시점에는 실제 repository로 `list_jobs`가 동작하지 않는다(쓰는 곳 없음) (#21)
+- ■ 2단계 완료 — 다음: 3단계 T4
+- ▶ 3단계 (순차) T4 시작 — service `list_jobs`와 가짜 repository 교체
+- ✔ T4 완료 — `user_job_service.py`(`list_jobs -> JobPage`, `_validate_limit`), `tests/test_user_job_service.py`(가짜 `find_active_page`, list 테스트 16개). pytest 253 passed (#22)
 
 ## spec과 달라진 점
 - 없음
