@@ -9,7 +9,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
 from src.models.enums import JobStatus
-from src.models.user_job import UserJob
+from src.models.user_job import JobPosition, UserJob
 
 
 class DuplicateJobNameError(Exception):
@@ -105,10 +105,29 @@ class UserJobRepository:
             return _to_model(doc)
         raise JobQuotaExceededError
 
-    # 유저의 삭제되지 않은 job을 최신순으로 반환한다.
-    async def find_active_by_owner(self, owner_id: str) -> list[UserJob]:
-        cursor = self.collection.find({"owner_id": owner_id, "is_deleted": False}).sort(
-            "created_at", DESCENDING
+    # 유저의 삭제되지 않은 job을 최신순(created_at 내림차순, 같으면 _id 내림차순)으로 최대 limit개 반환한다.
+    # - status가 있으면 그 상태만
+    # - after가 있으면 정렬 순서상 그 위치보다 뒤인 job만. 위치만 비교하므로 그 위치의 job이 지금 없어도 된다.
+    #   after.id가 ObjectId 형식이 아니면 ValueError(InvalidId). 호출자(service)가 cursor를 풀 때 형식을 확인한다.
+    async def find_active_page(
+        self,
+        owner_id: str,
+        status: JobStatus | None,
+        after: JobPosition | None,
+        limit: int,
+    ) -> list[UserJob]:
+        query: dict[str, Any] = {"owner_id": owner_id, "is_deleted": False}
+        if status is not None:
+            query["status"] = status.value
+        if after is not None:
+            query["$or"] = [
+                {"created_at": {"$lt": after.created_at}},
+                {"created_at": after.created_at, "_id": {"$lt": ObjectId(after.id)}},
+            ]
+        cursor = (
+            self.collection.find(query)
+            .sort([("created_at", DESCENDING), ("_id", DESCENDING)])
+            .limit(limit)
         )
         return [_to_model(doc) async for doc in cursor]
 
