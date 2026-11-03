@@ -37,6 +37,17 @@ class ErrorEnum(Enum):
         "env는 최대 20개, 이름은 [A-Za-z_][A-Za-z0-9_]*, 값은 1024자 이하여야 합니다.",
     )
     INVALID_SIZE = ("invalid_size", 400, "size는 small, medium 중 하나여야 합니다.")
+    INVALID_LIMIT = ("invalid_limit", 400, "limit은 1~100 사이의 정수여야 합니다.")
+    INVALID_JOB_STATUS = (
+        "invalid_job_status",
+        400,
+        "status는 pending, running, failed 중 하나만 지정할 수 있습니다.",
+    )
+    INVALID_CURSOR = (
+        "invalid_cursor",
+        400,
+        "cursor가 올바르지 않습니다. 직전 응답의 next_cursor를 그대로 보내야 합니다.",
+    )
     JOB_QUOTA_EXCEEDED = (
         "job_quota_exceeded",
         400,
