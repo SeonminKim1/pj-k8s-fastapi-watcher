@@ -1,11 +1,19 @@
 from typing import Annotated, Any
 
+from fastapi import Query, Request
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.core.exception.my_exception import ErrorEnum
 from src.core.exception.validation_error import error_code
+from src.models.enums import JobStatus
 from src.models.k8s_names import DnsLabel1035
-from src.models.user_job import JobTemplate
+from src.models.user_job import (
+    JOB_LIST_DEFAULT_LIMIT,
+    JOB_LIST_MAX_LIMIT,
+    JobTemplate,
+)
+from src.schemas.common_request import UserIdHeader
 
 # /jobs 요청 schema. 응답은 job_response.py.
 
@@ -47,3 +55,66 @@ JOB_CREATE_EXAMPLES: dict[str, dict[str, Any]] = {
         },
     },
 }
+
+
+class JobListRequest(BaseModel):
+    """GET /jobs 요청 값(헤더 + 쿼리). job_list_request()가 검증해서 만든다."""
+
+    user_id: str = Field(description="X-User-Id 헤더의 유저 ID")
+    limit: int = Field(description="한 페이지 최대 개수 1~100")
+    cursor: str | None = Field(description="직전 응답의 next_cursor. 없으면 첫 페이지")
+    status: JobStatus | None = Field(description="이 상태의 job만. 없으면 모든 상태")
+
+
+# /docs·/redoc에 보여 줄 쿼리 예. cursor 예는 실제 encode_cursor 결과다(테스트가 디코딩되는지 확인한다).
+JOB_LIST_CURSOR_EXAMPLE = (
+    "MjAyNi0xMC0yOVQwOTowMDowMC4xMjMwMDArMDA6MDB8NjcyMGExYjJjM2Q0ZTVmNmE3YjhjOWQw"
+)
+
+
+# GET /jobs의 헤더·쿼리를 검증해 JobListRequest로 만드는 dependency(docs/api-job-list/plan.md "status 중복 지정 검출").
+# - FastAPI는 같은 쿼리가 여러 번 오면 조용히 마지막 값을 쓰므로, status가 두 번 이상이면 직접 검증 에러를 낸다.
+# - 헤더를 엔드포인트가 아니라 여기서 받는 이유: FastAPI는 dependency를 엔드포인트 파라미터보다 먼저 실행한다.
+#   헤더가 엔드포인트에 있으면 헤더가 틀려도 이 함수의 status 중복 에러가 먼저 나가 우선순위(헤더 먼저)가 깨진다.
+#   여기 두면 헤더·limit·status 형식 에러가 있을 때 이 함수 본문이 실행되지 않고 함께 모여 우선순위대로 하나가 골라진다.
+# - limit의 범위 제약(Field)은 error_code 앞에 둬야 범위 에러도 invalid_limit이 된다(Query에 두면 감싸지지 않는다).
+def job_list_request(
+    request: Request,
+    user_id: UserIdHeader,
+    limit: Annotated[
+        int,
+        Field(ge=1, le=JOB_LIST_MAX_LIMIT),
+        error_code(ErrorEnum.INVALID_LIMIT),
+        Query(
+            description="한 페이지에 돌려줄 최대 개수. 1~100, 기본 20",
+            openapi_examples={"default": {"summary": "기본값", "value": 20}},
+        ),
+    ] = JOB_LIST_DEFAULT_LIMIT,
+    cursor: Annotated[
+        str | None,
+        Query(
+            description="직전 응답의 next_cursor를 그대로 보낸다. 없으면 첫 페이지. 형식은 불투명하다",
+            openapi_examples={
+                "first": {"summary": "첫 페이지(보내지 않음)", "value": None},
+                "next": {"summary": "다음 페이지", "value": JOB_LIST_CURSOR_EXAMPLE},
+            },
+        ),
+    ] = None,
+    status: Annotated[
+        JobStatus | None,
+        error_code(ErrorEnum.INVALID_JOB_STATUS),
+        Query(
+            description="이 상태의 job만 돌려준다. 한 번만 지정할 수 있다. 없으면 모든 상태",
+            openapi_examples={
+                "all": {"summary": "모든 상태(보내지 않음)", "value": None},
+                "running": {"summary": "running만", "value": "running"},
+            },
+        ),
+    ] = None,
+) -> JobListRequest:
+    if len(request.query_params.getlist("status")) > 1:
+        error = ErrorEnum.INVALID_JOB_STATUS
+        raise RequestValidationError(
+            [{"type": error.code, "loc": ("query", "status"), "msg": error.message}]
+        )
+    return JobListRequest(user_id=user_id, limit=limit, cursor=cursor, status=status)

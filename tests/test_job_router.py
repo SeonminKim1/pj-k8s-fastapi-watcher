@@ -9,9 +9,15 @@ from src.core.dependencies import get_user_job_service
 from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.main import app
 from src.models.enums import JobStatus
-from src.models.user_job import UserJob, WebTemplate
-from src.schemas.job_request import JOB_CREATE_EXAMPLES
-from src.schemas.job_response import JOB_RESPONSE_EXAMPLE, JobResponse
+from src.models.user_job import JobPage, UserJob, WebTemplate
+from src.schemas.job_request import JOB_CREATE_EXAMPLES, JOB_LIST_CURSOR_EXAMPLE
+from src.schemas.job_response import (
+    JOB_LIST_RESPONSE_EXAMPLE,
+    JOB_RESPONSE_EXAMPLE,
+    JobListResponse,
+    JobResponse,
+)
+from src.services.job_cursor import decode_cursor
 from src.services.job_templates import build_resources
 
 # lifespan을 타지 않도록 with 없이 쓴다(클러스터·MongoDB 불필요).
@@ -21,11 +27,21 @@ HEADERS = {"X-User-Id": "alice"}
 
 
 class FakeUserJobService:
-    """create_job 호출을 기록하고, error가 있으면 그 비즈니스 에러를 던진다."""
+    """create_job·list_jobs 호출을 기록하고, error가 있으면 그 비즈니스 에러를 던진다."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, WebTemplate]] = []
+        self.list_calls: list[tuple[str, int, str | None, JobStatus | None]] = []
+        self.page = JobPage(items=[], next_cursor=None)
         self.error: ErrorEnum | None = None
+
+    async def list_jobs(
+        self, owner_id: str, limit: int, cursor: str | None, status: JobStatus | None
+    ) -> JobPage:
+        self.list_calls.append((owner_id, limit, cursor, status))
+        if self.error is not None:
+            raise MyApiError(self.error)
+        return self.page
 
     async def create_job(
         self, owner_id: str, name: str, template: WebTemplate
@@ -33,22 +49,34 @@ class FakeUserJobService:
         self.calls.append((owner_id, name, template))
         if self.error is not None:
             raise MyApiError(self.error)
-        namespace = f"user-{owner_id}"
-        now = datetime(2026, 10, 28, tzinfo=UTC)
-        return UserJob(
-            id="0" * 24,
-            owner_id=owner_id,
-            namespace=namespace,
-            name=name,
-            template=template,
-            resources=build_resources(name, namespace, template),
-            quota_slot=0,
-            status=JobStatus.PENDING,
-            is_deleted=False,
-            created_at=now,
-            updated_at=now,
-            deleted_at=None,
-        )
+        return make_job(owner_id, name, template)
+
+
+# 응답 변환을 확인할 수 있게 실제 모양을 갖춘 UserJob을 만든다.
+def make_job(
+    owner_id: str = "alice",
+    name: str = "my-web",
+    template: WebTemplate | None = None,
+    status: JobStatus = JobStatus.PENDING,
+    job_id: str = "0" * 24,
+) -> UserJob:
+    template = template or WebTemplate(type="web", image="nginx:1.27", port=80)
+    namespace = f"user-{owner_id}"
+    now = datetime(2026, 10, 28, tzinfo=UTC)
+    return UserJob(
+        id=job_id,
+        owner_id=owner_id,
+        namespace=namespace,
+        name=name,
+        template=template,
+        resources=build_resources(name, namespace, template),
+        quota_slot=0,
+        status=status,
+        is_deleted=False,
+        created_at=now,
+        updated_at=now,
+        deleted_at=None,
+    )
 
 
 @pytest.fixture
@@ -264,3 +292,135 @@ def test_openapi_error_responses() -> None:
         assert set(content["example"]) == {"code", "message"}
     assert "spec.md" in op["description"]
     assert "example" in op["responses"]["201"]["content"]["application/json"]
+
+
+# --- GET /jobs (docs/api-job-list/spec.md) ---
+
+
+# 정상: 200, 항목은 요약 필드(id·name·status·created_at)뿐, next_cursor 그대로
+def test_list_jobs_200(service: FakeUserJobService) -> None:
+    service.page = JobPage(
+        items=[make_job(name="api", status=JobStatus.RUNNING, job_id="1" * 24)],
+        next_cursor="next",
+    )
+    r = client.get("/jobs", headers=HEADERS)
+    assert r.status_code == 200
+    assert r.json() == {
+        "items": [
+            {
+                "id": "1" * 24,
+                "name": "api",
+                "status": "running",
+                "created_at": "2026-10-28T00:00:00Z",
+            }
+        ],
+        "next_cursor": "next",
+    }
+
+
+def test_list_jobs_empty(service: FakeUserJobService) -> None:
+    r = client.get("/jobs", headers=HEADERS)
+    assert r.status_code == 200
+    assert r.json() == {"items": [], "next_cursor": None}
+
+
+# 쿼리가 없으면 기본값(limit 20, cursor·status 없음), 있으면 그대로 service로 간다. 정의되지 않은 쿼리는 무시.
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("", ("alice", 20, None, None)),
+        (
+            "?limit=5&cursor=abc&status=running",
+            ("alice", 5, "abc", JobStatus.RUNNING),
+        ),
+        ("?limit=100&sort=name&stauts=failed", ("alice", 100, None, None)),
+    ],
+)
+def test_list_jobs_passes_query(
+    service: FakeUserJobService, query: str, expected: tuple[Any, ...]
+) -> None:
+    assert client.get(f"/jobs{query}", headers=HEADERS).status_code == 200
+    assert service.list_calls == [expected]
+
+
+# spec "요청 검증 에러" 표의 행마다. 검증에서 걸리면 service를 부르지 않는다.
+@pytest.mark.parametrize(
+    ("headers", "query", "expected"),
+    [
+        ({}, "", ErrorEnum.INVALID_USER_ID),
+        ({"X-User-Id": "Alice"}, "", ErrorEnum.INVALID_USER_ID),
+        (HEADERS, "?limit=0", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?limit=-1", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?limit=101", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?limit=abc", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?limit=1.5", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?limit=", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?status=deleted", ErrorEnum.INVALID_JOB_STATUS),
+        (HEADERS, "?status=RUNNING", ErrorEnum.INVALID_JOB_STATUS),
+        (HEADERS, "?status=", ErrorEnum.INVALID_JOB_STATUS),
+        (HEADERS, "?status=running,failed", ErrorEnum.INVALID_JOB_STATUS),
+        (HEADERS, "?status=running&status=failed", ErrorEnum.INVALID_JOB_STATUS),
+        (HEADERS, "?status=running&status=running", ErrorEnum.INVALID_JOB_STATUS),
+    ],
+)
+def test_list_jobs_validation_errors(
+    service: FakeUserJobService,
+    headers: dict[str, str],
+    query: str,
+    expected: ErrorEnum,
+) -> None:
+    assert_error(client.get(f"/jobs{query}", headers=headers), expected)
+    assert service.list_calls == []
+
+
+# 여러 개가 틀리면 헤더 > limit > status. status 중복 검사도 이 순서를 지킨다.
+@pytest.mark.parametrize(
+    ("headers", "query", "expected"),
+    [
+        ({}, "?status=running&status=failed", ErrorEnum.INVALID_USER_ID),
+        ({}, "?limit=0&status=bad", ErrorEnum.INVALID_USER_ID),
+        (HEADERS, "?limit=0&status=running&status=failed", ErrorEnum.INVALID_LIMIT),
+        (HEADERS, "?limit=abc&status=bad", ErrorEnum.INVALID_LIMIT),
+    ],
+)
+def test_list_jobs_validation_priority(
+    service: FakeUserJobService,
+    headers: dict[str, str],
+    query: str,
+    expected: ErrorEnum,
+) -> None:
+    assert_error(client.get(f"/jobs{query}", headers=headers), expected)
+
+
+# service의 비즈니스 에러(잘못된 cursor)는 ErrorEnum 상태 코드·code 그대로
+def test_list_jobs_invalid_cursor(service: FakeUserJobService) -> None:
+    service.error = ErrorEnum.INVALID_CURSOR
+    r = client.get("/jobs?cursor=bad", headers=HEADERS)
+    assert_error(r, ErrorEnum.INVALID_CURSOR)
+
+
+# /docs 스키마: GET /jobs가 200·400·500만 문서화하고, 파라미터는 헤더 + 쿼리 3개다
+def test_openapi_list_jobs() -> None:
+    op = client.get("/openapi.json").json()["paths"]["/jobs"]["get"]
+    assert set(op["responses"]) == {"200", "400", "500"}
+    assert {(p["name"], p["in"]) for p in op["parameters"]} == {
+        ("X-User-Id", "header"),
+        ("limit", "query"),
+        ("cursor", "query"),
+        ("status", "query"),
+    }
+    assert "docs/api-job-list/spec.md" in op["description"]
+    assert "example" in op["responses"]["200"]["content"]["application/json"]
+
+
+# /docs·/redoc의 example: 응답 example은 JobListResponse 모양, cursor example은 실제로 풀리는 값,
+# 쿼리 example을 그대로 보내면 200이다.
+def test_openapi_list_examples_are_valid(service: FakeUserJobService) -> None:
+    JobListResponse.model_validate(JOB_LIST_RESPONSE_EXAMPLE)
+    decode_cursor(JOB_LIST_CURSOR_EXAMPLE)
+    r = client.get(
+        "/jobs",
+        headers=HEADERS,
+        params={"limit": 20, "status": "running", "cursor": JOB_LIST_CURSOR_EXAMPLE},
+    )
+    assert r.status_code == 200

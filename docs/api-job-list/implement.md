@@ -10,6 +10,9 @@
 - ■ 2단계 완료 — 다음: 3단계 T4
 - ▶ 3단계 (순차) T4 시작 — service `list_jobs`와 가짜 repository 교체
 - ✔ T4 완료 — `user_job_service.py`(`list_jobs -> JobPage`, `_validate_limit`), `tests/test_user_job_service.py`(가짜 `find_active_page`, list 테스트 16개). pytest 253 passed (#22)
+- ■ 3단계 완료 — 다음: 4단계 T5
+- ▶ 4단계 (순차) T5 시작 — schemas, `GET /jobs` 라우터, router 테스트
+- ✔ T5 완료 — `schemas/job_request.py`(`JobListRequest`, `job_list_request()`), `schemas/job_response.py`(`JobSummary`, `JobListResponse`, example), `routers/job_router.py`(`GET /jobs`), `tests/test_job_router.py`(list 테스트 26개). pytest 279 passed. 헤더를 dependency로 옮김(아래 메모) (#23)
 
 ## spec과 달라진 점
 - 없음
@@ -33,3 +36,6 @@
   5. cursor 위치의 job을 삭제한 뒤에도 그 위치 뒤가 이어짐
   6. 다른 유저(bob)의 위치로 조회해도 alice의 job만 나옴
   - 실행 계획: MongoDB는 `owner_created_at`이 아니라 `uniq_owner_name`(`{owner_id, name}`, `is_deleted: false` partial)을 골랐다. 쿼리에 `is_deleted: false`가 있어 삭제된 문서가 빠진 partial 인덱스가 더 좁기 때문이다. 유저당 최대 10개를 메모리 정렬하므로 문제없고, 인덱스를 바꾸지 않는다는 plan 결정과도 맞다.
+- T5 dependency 설계(plan의 `JobListQuery`·`job_list_query()` → `JobListRequest`·`job_list_request()`): FastAPI 0.162.0에서 직접 확인한 두 가지 때문에 바꿨다. 외부 동작은 spec 그대로다.
+  1. FastAPI는 dependency를 엔드포인트 파라미터보다 먼저 실행한다. 헤더를 엔드포인트에 두면 헤더가 없어도 dependency의 `status` 중복 에러가 먼저 나가 spec 우선순위(헤더 1순위)가 깨진다. 헤더를 dependency 파라미터로 옮기면 헤더·limit·status 형식 에러가 있을 때 dependency 본문이 실행되지 않고, 모인 에러에서 우선순위대로 하나가 골라진다. 그래서 요청 모델에 `user_id`가 들어가 이름을 `JobListRequest`로 했다.
+  2. `Query(ge=1, le=100)`에 둔 범위 제약은 `error_code()`의 감싸기 밖에서 적용돼 pydantic 기본 에러(`greater_than_equal`)가 나간다. `Annotated[int, Field(ge, le), error_code(...), Query(...)]`처럼 제약을 `error_code` 앞에 둬야 `invalid_limit`이 된다.
