@@ -7,7 +7,7 @@
 ## Phase 1: 유저 스토리 1·2 - 내 job 상세, 내 것이 아니면 없음 (P1) 🎯 MVP
 - **목표**: `GET /jobs/{job_id}`가 자기 job은 생성 응답과 같은 상세로, 남의 job·없음·삭제됨·잘못된 ID는 같은 404 `job_not_found`로 응답
 - **독립 테스트**: router 테스트(가짜 service)와 quickstart 시나리오 1~3
-- [ ] T001 [US1] [US2] 404 응답 문서와 `GET /jobs/{job_id}` 라우터 + router 테스트 — `src/schemas/error_response.py`, `src/routers/job_router.py`, `tests/test_job_router.py` — 선행: 없음
+- [x] T001 [US1] [US2] 404 응답 문서와 `GET /jobs/{job_id}` 라우터 + router 테스트 — `src/schemas/error_response.py`, `src/routers/job_router.py`, `tests/test_job_router.py` — 선행: 없음
   - `error_response.py`: `NOT_FOUND_RESPONSES`(404: `ErrorResponse` + `job_not_found` example), `COMMON_ERROR_RESPONSES` 주석의 code 목록 기준을 "각 기능의 contracts 에러 표"로
   - 라우터: `response_model=JobResponse`, `description`에 `specs/004-api-job-get/contracts/get-job.md` 경로, `responses`에 200 example `JOB_RESPONSE_EXAMPLE`·`NOT_FOUND_RESPONSES`
   - 테스트: 200 본문·`get_job(owner_id, job_id)` 전달, `running` 상태 job의 상태·`updated_at`이 그대로 나옴(US1/AC2), `JOB_NOT_FOUND` 404 본문, 헤더 없음·형식 오류 400 `invalid_user_id`(service 미호출), OpenAPI 200·400·404·500, 404 example, `POST /jobs`·`GET /jobs`에 404 없음, 200 example이 `JobResponse`로 검증

@@ -33,11 +33,22 @@ def _error_doc(description: str, example: ErrorResponse) -> dict[str, Any]:
 
 _BAD_REQUEST = ErrorEnum.INVALID_PARAMETER
 
-# 라우터 공통 에러 응답(APIRouter(responses=...)). 엔드포인트별 code 목록은 각 기능의 spec.md "에러 케이스"가 기준이다.
+# 라우터 공통 에러 응답(APIRouter(responses=...)): 모든 엔드포인트가 돌려주는 400·500.
+# 엔드포인트별 code 목록은 각 기능의 contracts 에러 표가 기준이다.
 COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     400: _error_doc(
         "잘못된 요청·규칙 위반. code로 구분한다(목록은 엔드포인트 설명의 spec 참고)",
         ErrorResponse(code=_BAD_REQUEST.code, message=_BAD_REQUEST.message),
     ),
     500: _error_doc("서버 내부 오류(db_error, unknown_error)", DB_ERROR),
+}
+
+_NOT_FOUND = ErrorEnum.JOB_NOT_FOUND
+
+# 404를 돌려주는 엔드포인트에만 붙이는 응답 문서(남의 job·없음·삭제됨·잘못된 ID).
+NOT_FOUND_RESPONSES: dict[int | str, dict[str, Any]] = {
+    404: _error_doc(
+        "job 없음. 남의 job·삭제된 job·형식이 틀린 ID도 같은 응답",
+        ErrorResponse(code=_NOT_FOUND.code, message=_NOT_FOUND.message),
+    ),
 }
