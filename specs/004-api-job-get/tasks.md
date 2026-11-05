@@ -17,7 +17,7 @@
 - [x] T003 [US1] 서버 시각 `_now()`(UTC, 밀리초로 자름)를 생성·상태 갱신·삭제에 적용 + service 테스트(세 시각이 밀리초 단위) — `src/services/user_job_service.py`, `tests/test_user_job_service.py` — 선행: T001
 
 ## Phase 3: 마무리 (Polish)
-- [ ] T002 README API 표에 `GET /jobs/{job_id}`·에러 상세 링크, quickstart 시나리오 1~4 직접 확인, 완료 체크리스트 — `README.md` — 선행: T003
+- [x] T002 README API 표에 `GET /jobs/{job_id}`·에러 상세 링크, quickstart 시나리오 1~4 직접 확인, 완료 체크리스트 — `README.md` — 선행: T003
 
 ## 실행 흐름 (Dependencies & Execution Order)
 1. (순차) T001

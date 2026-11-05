@@ -9,18 +9,23 @@
 - ▶ 3단계 (순차) T003 시작 — 서버 시각을 밀리초로(생성·상태 갱신·삭제)
 - ✔ T003 완료 — `src/services/user_job_service.py`(`_now()`), `tests/test_user_job_service.py`(`test_times_are_milliseconds`). pytest 296 passed. 실제 앱에서 생성 응답 = 조회 응답 확인
 - ■ 3단계 완료 — 다음: T002 재개
+- ▶ T002 재개 — README, quickstart 시나리오 1~4 직접 확인
+- ✔ T002 완료 — `README.md` API 표·에러 상세 링크. 실제 앱(임시 DB `tmp_api_job_get_e2e`, kubeconfig `minikube`, 확인 후 DB 삭제)으로 시나리오 1~4 통과(아래 메모). ruff 통과, pytest 296 passed
+- ■ 모든 작업 완료 — 다음: `/sdd-speckit-converge`
 
 ## spec과 달라진 점
 - 없음
 
 ## 완료 체크리스트
-- [ ] `uv run ruff check .` / `uv run ruff format .` 통과
-- [ ] 레이어 규칙·에러 표현 준수 (Router → Service → Repository, 비즈니스 에러는 `MyApiError`)
-- [ ] quickstart 시나리오(정상·에러)를 직접 실행해 확인 (`/docs`)
-- [ ] `/redoc`에서 요청·응답 example이 실제 값으로 보이는지 확인
-- [ ] `uv run pytest` 통과 (비즈니스 규칙·에러 케이스마다 테스트)
-- [ ] README 등 관련 문서 갱신
+- [x] `uv run ruff check .` / `uv run ruff format .` 통과
+- [x] 레이어 규칙·에러 표현 준수 (Router → Service → Repository, 비즈니스 에러는 `MyApiError`)
+- [x] quickstart 시나리오(정상·에러)를 직접 실행해 확인 (`/docs`와 같은 요청을 실제 앱에 curl)
+- [x] `/redoc`에서 요청·응답 example이 실제 값으로 보이는지 확인 (OpenAPI JSON의 200·404 example로 확인, `/redoc` 200. 브라우저로는 열어 보지 않음)
+- [x] `uv run pytest` 통과 (296 passed. 없음 4경우는 service 테스트, 404·400·문서는 router 테스트)
+- [x] README 등 관련 문서 갱신
 - [ ] tasks.md 모두 완료, converge `✅ 수렴`
 
 ## 메모
 - 이슈 트래커: 이 기능은 이슈를 만들지 않는다(tasks.md).
+- quickstart 확인(T002): 1) 200, 생성 응답과 본문이 같음 2) 남의 job·형식은 맞지만 없는 ID·`abc` 모두 404 `job_not_found`, 같은 본문 3) 헤더 없음 400 `invalid_user_id` 4) `/jobs/{job_id}`만 404 문서, 200·404 example. 삭제된 job은 삭제 API가 없어 직접 호출하지 않고 service 테스트(`test_get_job_not_found[deleted]`)로 확인한다.
+- 첫 확인에서 생성 응답 시각(마이크로초)과 조회 응답 시각(MongoDB 밀리초)이 달라 T003을 추가했다. 가짜 repository를 쓰는 단위 테스트로는 드러나지 않는 차이였다.
