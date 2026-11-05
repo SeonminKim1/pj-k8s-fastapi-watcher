@@ -37,7 +37,7 @@ _BAD_REQUEST = ErrorEnum.INVALID_PARAMETER
 # 엔드포인트별 code 목록은 각 기능의 contracts 에러 표가 기준이다.
 COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     400: _error_doc(
-        "잘못된 요청·규칙 위반. code로 구분한다(목록은 엔드포인트 설명의 spec 참고)",
+        "잘못된 요청·규칙 위반. code로 구분한다(목록은 엔드포인트 설명의 contracts 에러 표)",
         ErrorResponse(code=_BAD_REQUEST.code, message=_BAD_REQUEST.message),
     ),
     500: _error_doc("서버 내부 오류(db_error, unknown_error)", DB_ERROR),

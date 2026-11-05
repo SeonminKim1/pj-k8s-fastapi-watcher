@@ -12,6 +12,9 @@
 - ▶ T002 재개 — README, quickstart 시나리오 1~4 직접 확인
 - ✔ T002 완료 — `README.md` API 표·에러 상세 링크. 실제 앱(임시 DB `tmp_api_job_get_e2e`, kubeconfig `minikube`, 확인 후 DB 삭제)으로 시나리오 1~4 통과(아래 메모). ruff 통과, pytest 296 passed
 - ■ 모든 작업 완료 — 다음: `/sdd-speckit-converge`
+- converge: 남은 일 2건(LOW partial) → 수렴 phase T004·T005 추가
+- ▶ 수렴 phase (순차) T004 시작 — `/docs` 400 설명 문구를 contracts 기준으로
+- ✔ T004 완료 — `src/schemas/error_response.py`. OpenAPI 세 엔드포인트의 400 설명 확인, pytest 296 passed
 
 ## spec과 달라진 점
 - 없음
