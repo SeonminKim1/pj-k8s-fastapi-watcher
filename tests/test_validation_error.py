@@ -68,7 +68,7 @@ def test_priority(data: dict[str, Any], expected: ErrorEnum) -> None:
     assert to_error_enum(body_errors(data)) == expected
 
 
-# GET /jobs 쿼리 에러: invalid_user_id > invalid_limit > invalid_job_status (docs/api-job-list/spec.md)
+# GET /jobs 쿼리 에러: invalid_user_id > invalid_limit > invalid_job_status (specs/003-api-job-list/contracts/get-jobs.md)
 LIMIT_ERROR = {"type": "invalid_limit", "loc": ("query", "limit")}
 STATUS_ERROR = {"type": "invalid_job_status", "loc": ("query", "status")}
 HEADER_MISSING = {"type": "missing", "loc": ("header", "x-user-id")}

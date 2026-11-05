@@ -6,6 +6,7 @@
 
 ## 실행
 ```bash
+git submodule update --init   # .claude (ai-shared-dev-toolkit)
 uv sync
 uv run uvicorn src.main:app --reload
 ```
@@ -24,7 +25,7 @@ uv run uvicorn src.main:app --reload
 | `POST` | `/jobs` | job 생성. `X-User-Id` 헤더 필수. 템플릿 입력(`web`)으로 서버가 Deployment·Service 매니페스트를 만들어 `pending`으로 저장(클러스터 반영은 operator). 유저당 10개 |
 | `GET` | `/jobs` | 삭제되지 않은 자기 job 요약(`id`·`name`·`status`·`created_at`)을 최신순으로 조회. `X-User-Id` 헤더 필수. 쿼리 `limit`(1~100, 기본 20), `cursor`(직전 응답의 `next_cursor`), `status`(하나만). 응답 `{items, next_cursor}` |
 
-- 에러 응답은 `{code, message}`이며 400·404·500만 쓴다. 요청 형식 오류는 필드별 `code`(`invalid_image`, `invalid_port` 등)로 구분한다. 상세: [docs/api-job-create/spec.md](docs/api-job-create/spec.md), [docs/api-job-list/spec.md](docs/api-job-list/spec.md)
+- 에러 응답은 `{code, message}`이며 400·404·500만 쓴다. 요청 형식 오류는 필드별 `code`(`invalid_image`, `invalid_port` 등)로 구분한다. 상세: [specs/002-api-job-create/contracts/post-jobs.md](specs/002-api-job-create/contracts/post-jobs.md), [specs/003-api-job-list/contracts/get-jobs.md](specs/003-api-job-list/contracts/get-jobs.md)
 
 ## 개발
 ```bash
@@ -32,6 +33,7 @@ uv run ruff check . && uv run ruff format .
 uv run pytest                                   # 전체 테스트
 uv run pytest tests/test_main.py::test_openapi_docs   # 단일 테스트
 ```
-- 코드 규칙: [docs/fastapi-sdd-template.md](docs/fastapi-sdd-template.md)
-- 개발 프로세스: [sdd-process.md](sdd-process.md)
+- 코드 규칙: [.claude/stacks/fastapi.md](.claude/stacks/fastapi.md)
+- 개발 프로세스(SDD): [.claude/skills/sdd-speckit/process.md](.claude/skills/sdd-speckit/process.md) — 기능은 `/sdd-speckit-specify`부터 진행, 기능 문서는 [specs/](specs/)
+- `.claude/`는 [ai-shared-dev-toolkit](https://github.com/SeonminKim1/ai-shared-dev-toolkit) 서브모듈이다. clone 후 `git submodule update --init`
 

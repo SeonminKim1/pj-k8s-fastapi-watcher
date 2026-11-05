@@ -80,7 +80,7 @@ _JOB_LIST_QUERY_ERRORS: dict[str, ErrorEnum] = {
 }
 
 
-# GET /jobs의 헤더·쿼리를 검증해 JobListRequest로 만드는 dependency(docs/api-job-list/plan.md "status 중복 지정 검출").
+# GET /jobs의 헤더·쿼리를 검증해 JobListRequest로 만드는 dependency(specs/003-api-job-list/research.md "같은 쿼리 중복 지정 검출").
 # - FastAPI는 같은 쿼리가 여러 번 오면 조용히 마지막 값을 쓰므로, 쿼리가 두 번 이상이면 직접 그 필드의 검증 에러를 낸다.
 #   중복 검사는 함수 본문에서 하므로 다른 형식 에러가 없을 때만 돈다(spec "요청 검증 에러").
 # - 헤더를 엔드포인트가 아니라 여기서 받는 이유: FastAPI는 dependency를 엔드포인트 파라미터보다 먼저 실행한다.

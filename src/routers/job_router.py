@@ -27,7 +27,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"], responses=COMMON_ERROR_RESPONS
     "",
     status_code=201,
     response_model=JobResponse,
-    description='에러 code: `docs/api-job-create/spec.md` "에러 케이스"',
+    description='에러 code: `specs/002-api-job-create/contracts/post-jobs.md` "에러"',
     responses={
         201: {"content": {"application/json": {"example": JOB_RESPONSE_EXAMPLE}}}
     },
@@ -47,7 +47,7 @@ async def create_job(
 @router.get(
     "",
     response_model=JobListResponse,
-    description='에러 code: `docs/api-job-list/spec.md` "에러 케이스"',
+    description='에러 code: `specs/003-api-job-list/contracts/get-jobs.md` "에러"',
     responses={
         200: {"content": {"application/json": {"example": JOB_LIST_RESPONSE_EXAMPLE}}}
     },

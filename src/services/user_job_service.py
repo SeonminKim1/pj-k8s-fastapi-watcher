@@ -83,7 +83,7 @@ class UserJobService:
             raise MyApiError(ErrorEnum.JOB_NAME_DUPLICATED) from e
 
     # 삭제되지 않은 자기 job을 최신순(created_at 내림차순, 같으면 id 내림차순)으로 최대 limit개 반환한다.
-    # cursor는 직전 페이지 마지막 항목의 위치이고, status가 있으면 그 상태만 돌려준다(docs/api-job-list/spec.md).
+    # cursor는 직전 페이지 마지막 항목의 위치이고, status가 있으면 그 상태만 돌려준다(specs/003-api-job-list/contracts/get-jobs.md).
     # limit + 1개를 읽어 다음 페이지에 항목이 실제로 있을 때만 next_cursor를 준다.
     # 검사 순서: owner_id(INVALID_USER_ID) → limit(INVALID_LIMIT) → cursor(INVALID_CURSOR).
     async def list_jobs(

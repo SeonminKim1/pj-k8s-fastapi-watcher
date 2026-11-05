@@ -290,11 +290,11 @@ def test_openapi_error_responses() -> None:
         content = op["responses"][status]["content"]["application/json"]
         assert content["schema"] == {"$ref": "#/components/schemas/ErrorResponse"}
         assert set(content["example"]) == {"code", "message"}
-    assert "spec.md" in op["description"]
+    assert "specs/002-api-job-create/contracts/post-jobs.md" in op["description"]
     assert "example" in op["responses"]["201"]["content"]["application/json"]
 
 
-# --- GET /jobs (docs/api-job-list/spec.md) ---
+# --- GET /jobs (specs/003-api-job-list/contracts/get-jobs.md) ---
 
 
 # 정상: 200, 항목은 요약 필드(id·name·status·created_at)뿐, next_cursor 그대로
@@ -418,7 +418,7 @@ def test_openapi_list_jobs() -> None:
         ("cursor", "query"),
         ("status", "query"),
     }
-    assert "docs/api-job-list/spec.md" in op["description"]
+    assert "specs/003-api-job-list/contracts/get-jobs.md" in op["description"]
     assert "example" in op["responses"]["200"]["content"]["application/json"]
 
 
