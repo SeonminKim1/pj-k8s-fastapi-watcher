@@ -11,6 +11,11 @@ from src.models.k8s_names import EnvName, ImageRef
 # 유저 한 명이 가질 수 있는 삭제되지 않은 job 수(CLAUDE.md "유저별 job 개수 제한").
 MAX_JOBS_PER_USER = 10
 
+# job 목록 한 페이지의 기본 개수와 상한(docs/api-job-list/spec.md). schema와 service가 함께 쓴다.
+# 상한을 바꾸면 ErrorEnum.INVALID_LIMIT 메시지(enum 값이라 상수로 만들 수 없음)도 함께 고친다.
+JOB_LIST_DEFAULT_LIMIT = 20
+JOB_LIST_MAX_LIMIT = 100
+
 
 # 이전 상태 → 갈 수 있는 다음 상태. pending으로 돌아가는 전이는 없다.
 ALLOWED_STATUS_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
@@ -96,3 +101,21 @@ class UserJob(BaseModel):
     created_at: datetime = Field(description="생성 시각(UTC)")
     updated_at: datetime = Field(description="마지막 변경 시각(UTC)")
     deleted_at: datetime | None = Field(description="삭제 시각(UTC). 삭제 전에는 None")
+
+
+class JobPosition(BaseModel):
+    """목록 정렬(created_at 내림차순, 같으면 id 내림차순)에서의 위치. cursor가 가리키는 지점이다."""
+
+    created_at: datetime = Field(description="위치를 정하는 job의 생성 시각(UTC)")
+    id: str = Field(
+        description="위치를 정하는 job의 ID(ObjectId 문자열). 같은 시각일 때 순서를 정한다"
+    )
+
+
+class JobPage(BaseModel):
+    """job 목록 한 페이지."""
+
+    items: list[UserJob] = Field(description="이번 페이지의 job. 최신순")
+    next_cursor: str | None = Field(
+        description="다음 페이지 cursor. 다음 페이지에 항목이 없으면 None"
+    )

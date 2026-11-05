@@ -1,8 +1,7 @@
-from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol
 
 from src.models.enums import JobSize, JobType
-from src.models.user_job import JobResource, JobTemplate, WebTemplate
+from src.models.user_job_models import JobResource, JobTemplate, WebTemplate
 
 # 템플릿 입력 → 매니페스트 생성. 유저가 정하지 않는 값(라벨, 리소스, 보안 설정 등)은 여기서 고정한다.
 # 타입을 추가하면 생성 함수 하나와 _BUILDERS·KINDS_BY_TYPE 한 줄씩을 더한다.
@@ -85,7 +84,15 @@ def _build_web(name: str, namespace: str, template: WebTemplate) -> list[JobReso
     return [_resource(deployment), _resource(service)]
 
 
-_BUILDERS: dict[JobType, Callable[[str, str, Any], list[JobResource]]] = {
+class _Builder(Protocol):
+    """타입별 생성 함수의 모양. 키워드 인자로 부를 수 있게 Callable 대신 인자 이름이 있는 Protocol로 둔다."""
+
+    def __call__(
+        self, name: str, namespace: str, template: Any
+    ) -> list[JobResource]: ...
+
+
+_BUILDERS: dict[JobType, _Builder] = {
     JobType.WEB: _build_web,
     # 추후 JobType.DB: _build_db 등
 }
@@ -95,4 +102,4 @@ _BUILDERS: dict[JobType, Callable[[str, str, Any], list[JobResource]]] = {
 def build_resources(
     name: str, namespace: str, template: JobTemplate
 ) -> list[JobResource]:
-    return _BUILDERS[template.type](name, namespace, template)
+    return _BUILDERS[template.type](name=name, namespace=namespace, template=template)

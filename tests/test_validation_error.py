@@ -68,6 +68,24 @@ def test_priority(data: dict[str, Any], expected: ErrorEnum) -> None:
     assert to_error_enum(body_errors(data)) == expected
 
 
+# GET /jobs 쿼리 에러: invalid_user_id > invalid_limit > invalid_job_status (docs/api-job-list/spec.md)
+LIMIT_ERROR = {"type": "invalid_limit", "loc": ("query", "limit")}
+STATUS_ERROR = {"type": "invalid_job_status", "loc": ("query", "status")}
+HEADER_MISSING = {"type": "missing", "loc": ("header", "x-user-id")}
+
+
+@pytest.mark.parametrize(
+    ("errors", "expected"),
+    [
+        ([STATUS_ERROR], ErrorEnum.INVALID_JOB_STATUS),
+        ([STATUS_ERROR, LIMIT_ERROR], ErrorEnum.INVALID_LIMIT),
+        ([STATUS_ERROR, LIMIT_ERROR, HEADER_MISSING], ErrorEnum.INVALID_USER_ID),
+    ],
+)
+def test_query_priority(errors: list[dict[str, Any]], expected: ErrorEnum) -> None:
+    assert to_error_enum(errors) == expected
+
+
 # 헤더 에러는 가장 먼저. FastAPI는 헤더 이름을 소문자로 넣지만 대소문자와 상관없이 매칭한다.
 @pytest.mark.parametrize("header", ["x-user-id", "X-User-Id"])
 def test_header_error_first(header: str) -> None:

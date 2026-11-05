@@ -11,7 +11,7 @@ from src.models.k8s_names import (
     is_pinned_image,
     is_user_id,
 )
-from src.models.user_job import JobTemplate, WebTemplate
+from src.models.user_job_models import JobTemplate, WebTemplate
 
 template_adapter = TypeAdapter(JobTemplate)
 
