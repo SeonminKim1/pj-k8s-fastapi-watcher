@@ -4,10 +4,11 @@ from fastapi import APIRouter, Body, Depends
 
 from src.core.dependencies import get_user_job_service
 from src.schemas.common_request import UserIdHeader
-from src.schemas.error_response import COMMON_ERROR_RESPONSES
+from src.schemas.error_response import COMMON_ERROR_RESPONSES, JOB_NOT_FOUND_RESPONSES
 from src.schemas.job_request import (
     JOB_CREATE_EXAMPLES,
     JobCreateRequest,
+    JobIdPath,
     JobListRequest,
     job_list_request,
 )
@@ -63,3 +64,22 @@ async def list_jobs(
         status=query.status,
     )
     return JobListResponse.from_page(page)
+
+
+# 삭제되지 않은 자기 job 하나의 상세를 돌려준다. 남의 job·없음·삭제됨·잘못된 ID는 모두 404. MongoDB만 읽는다.
+@router.get(
+    "/{job_id}",
+    response_model=JobResponse,
+    description='에러 code: `specs/004-api-job-get/contracts/get-job.md` "에러"',
+    responses={
+        200: {"content": {"application/json": {"example": JOB_RESPONSE_EXAMPLE}}},
+        **JOB_NOT_FOUND_RESPONSES,
+    },
+)
+async def get_job(
+    job_id: JobIdPath,
+    user_id: UserIdHeader,
+    service: Annotated[UserJobService, Depends(get_user_job_service)],
+) -> JobResponse:
+    job = await service.get_job(owner_id=user_id, job_id=job_id)
+    return JobResponse.from_job(job)

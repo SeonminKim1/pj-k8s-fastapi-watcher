@@ -1,5 +1,5 @@
 from collections.abc import Collection
-from datetime import datetime
+from datetime import UTC, datetime, tzinfo
 from typing import Any
 
 import pytest
@@ -19,6 +19,7 @@ from src.repository.user_job_repository import (
     DuplicateJobNameError,
     JobQuotaExceededError,
 )
+from src.services import user_job_service
 from src.services.user_job_service import UserJobService
 
 
@@ -562,3 +563,30 @@ async def test_delete_job_not_found(service: UserJobService, case: str) -> None:
     with pytest.raises(MyApiError) as e:
         await service.delete_job(owner, job_id)
     assert_error(e, ErrorEnum.JOB_NOT_FOUND)
+
+
+# 서버 시각을 마이크로초가 있는 고정 값으로 바꾼다. _now()가 밀리초로 자르는지 매번 같은 결과로 확인하기 위함이다.
+FIXED_NOW = datetime(2026, 11, 6, 12, 0, 0, 123456, tzinfo=UTC)
+FIXED_NOW_MS = datetime(2026, 11, 6, 12, 0, 0, 123000, tzinfo=UTC)
+
+
+class _FixedClock(datetime):
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> datetime:
+        return FIXED_NOW
+
+
+# 서버가 만드는 시각(생성·상태 갱신·삭제)은 밀리초로 잘린다. MongoDB 저장 정밀도와 같아 생성 응답과 조회 응답이 같다.
+async def test_times_are_milliseconds(
+    service: UserJobService,
+    repo: FakeUserJobRepository,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(user_job_service, "datetime", _FixedClock)
+    job = await service.create_job(owner_id="alice", name="my-app", template=web())
+    assert job.created_at == job.updated_at == FIXED_NOW_MS
+    assert await service.get_job("alice", job.id) == job
+    updated = await service.update_job_status(job.id, JobStatus.RUNNING)
+    assert updated.updated_at == FIXED_NOW_MS
+    await service.delete_job("alice", job.id)
+    assert repo.docs[job.id]["deleted_at"] == FIXED_NOW_MS

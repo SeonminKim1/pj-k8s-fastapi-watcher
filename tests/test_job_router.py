@@ -10,7 +10,11 @@ from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.main import app
 from src.models.enums import JobStatus
 from src.models.user_job_models import JobPage, UserJob, WebTemplate
-from src.schemas.job_request import JOB_CREATE_EXAMPLES, JOB_LIST_CURSOR_EXAMPLE
+from src.schemas.job_request import (
+    JOB_CREATE_EXAMPLES,
+    JOB_ID_EXAMPLES,
+    JOB_LIST_CURSOR_EXAMPLE,
+)
 from src.schemas.job_response import (
     JOB_LIST_RESPONSE_EXAMPLE,
     JOB_RESPONSE_EXAMPLE,
@@ -27,12 +31,14 @@ HEADERS = {"X-User-Id": "alice"}
 
 
 class FakeUserJobService:
-    """create_job·list_jobs 호출을 기록하고, error가 있으면 그 비즈니스 에러를 던진다."""
+    """create_job·list_jobs·get_job 호출을 기록하고, error가 있으면 그 비즈니스 에러를 던진다."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, WebTemplate]] = []
         self.list_calls: list[tuple[str, int, str | None, JobStatus | None]] = []
         self.page = JobPage(items=[], next_cursor=None)
+        self.get_calls: list[tuple[str, str]] = []
+        self.job = make_job()
         self.error: ErrorEnum | None = None
 
     async def list_jobs(
@@ -42,6 +48,12 @@ class FakeUserJobService:
         if self.error is not None:
             raise MyApiError(self.error)
         return self.page
+
+    async def get_job(self, owner_id: str, job_id: str) -> UserJob:
+        self.get_calls.append((owner_id, job_id))
+        if self.error is not None:
+            raise MyApiError(self.error)
+        return self.job
 
     async def create_job(
         self, owner_id: str, name: str, template: WebTemplate
@@ -433,3 +445,96 @@ def test_openapi_list_examples_are_valid(service: FakeUserJobService) -> None:
         params={"limit": 20, "status": "running", "cursor": JOB_LIST_CURSOR_EXAMPLE},
     )
     assert r.status_code == 200
+
+
+# --- GET /jobs/{job_id} (specs/004-api-job-get/contracts/get-job.md) ---
+
+JOB_ID = "6720a1b2c3d4e5f6a7b8c9d0"
+
+
+# 정상: 200, 본문은 생성 응답과 같은 JobResponse(owner_id·quota_slot·매니페스트 본문 없음), 인자 그대로 전달
+def test_get_job_200(service: FakeUserJobService) -> None:
+    service.job = make_job(job_id=JOB_ID)
+    r = client.get(f"/jobs/{JOB_ID}", headers=HEADERS)
+    assert r.status_code == 200
+    assert r.json() == JobResponse.from_job(service.job).model_dump(mode="json")
+    assert set(r.json()) == {
+        "id",
+        "name",
+        "namespace",
+        "status",
+        "template",
+        "resources",
+        "created_at",
+        "updated_at",
+    }
+    assert service.get_calls == [("alice", JOB_ID)]
+
+
+# operator가 바꾼 상태·변경 시각이 그대로 나온다(US1/AC2)
+def test_get_job_reflects_status(service: FakeUserJobService) -> None:
+    job = make_job(job_id=JOB_ID, status=JobStatus.RUNNING)
+    service.job = job.model_copy(
+        update={"updated_at": datetime(2026, 10, 29, tzinfo=UTC)}
+    )
+    data = client.get(f"/jobs/{JOB_ID}", headers=HEADERS).json()
+    assert data["status"] == "running"
+    assert data["updated_at"] == "2026-10-29T00:00:00Z"
+
+
+# 남의 job·없음·삭제됨·잘못된 ID는 service가 JOB_NOT_FOUND로 알리고, 404 본문은 하나다.
+# 잘못된 ID 형식도 schema에서 막지 않고 service까지 간다.
+@pytest.mark.parametrize("job_id", [JOB_ID, "abc"])
+def test_get_job_not_found(service: FakeUserJobService, job_id: str) -> None:
+    service.error = ErrorEnum.JOB_NOT_FOUND
+    assert_error(
+        client.get(f"/jobs/{job_id}", headers=HEADERS), ErrorEnum.JOB_NOT_FOUND
+    )
+    assert service.get_calls == [("alice", job_id)]
+
+
+# 헤더 없음·형식 오류는 400 invalid_user_id이고 service를 부르지 않는다(job ID가 틀려도 먼저)
+@pytest.mark.parametrize("headers", [{}, {"X-User-Id": "Bad_User!"}])
+def test_get_job_invalid_user_id(
+    service: FakeUserJobService, headers: dict[str, str]
+) -> None:
+    assert_error(client.get("/jobs/abc", headers=headers), ErrorEnum.INVALID_USER_ID)
+    assert service.get_calls == []
+
+
+# /docs: GET /jobs/{job_id}는 200·400·404·500, 404는 이 엔드포인트에만 있다
+def test_openapi_get_job() -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+    op = paths["/jobs/{job_id}"]["get"]
+    assert set(op["responses"]) == {"200", "400", "404", "500"}
+    assert {(p["name"], p["in"]) for p in op["parameters"]} == {
+        ("job_id", "path"),
+        ("X-User-Id", "header"),
+    }
+    assert "specs/004-api-job-get/contracts/get-job.md" in op["description"]
+    not_found = op["responses"]["404"]["content"]["application/json"]
+    assert not_found["schema"] == {"$ref": "#/components/schemas/ErrorResponse"}
+    assert not_found["example"] == {
+        "code": ErrorEnum.JOB_NOT_FOUND.code,
+        "message": ErrorEnum.JOB_NOT_FOUND.message,
+    }
+    assert "404" not in paths["/jobs"]["post"]["responses"]
+    assert "404" not in paths["/jobs"]["get"]["responses"]
+
+
+# /docs·/redoc의 200 example은 JobResponse로 검증된다
+def test_openapi_get_job_example_is_valid() -> None:
+    op = client.get("/openapi.json").json()["paths"]["/jobs/{job_id}"]["get"]
+    example = op["responses"]["200"]["content"]["application/json"]["example"]
+    JobResponse.model_validate(example)
+
+
+# /docs·/redoc: job_id path 파라미터에 설명과 example이 있고, example 값으로 요청하면 200이다
+def test_openapi_get_job_path_param(service: FakeUserJobService) -> None:
+    op = client.get("/openapi.json").json()["paths"]["/jobs/{job_id}"]["get"]
+    (param,) = [p for p in op["parameters"] if p["name"] == "job_id"]
+    assert param["description"]
+    assert param["examples"] == JOB_ID_EXAMPLES
+    job_id = JOB_ID_EXAMPLES["job"]["value"]
+    assert client.get(f"/jobs/{job_id}", headers=HEADERS).status_code == 200
+    assert service.get_calls == [("alice", job_id)]

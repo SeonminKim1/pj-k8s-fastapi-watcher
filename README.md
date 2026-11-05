@@ -24,8 +24,9 @@ uv run uvicorn src.main:app --reload
 |---|---|---|
 | `POST` | `/jobs` | job 생성. `X-User-Id` 헤더 필수. 템플릿 입력(`web`)으로 서버가 Deployment·Service 매니페스트를 만들어 `pending`으로 저장(클러스터 반영은 operator). 유저당 10개 |
 | `GET` | `/jobs` | 삭제되지 않은 자기 job 요약(`id`·`name`·`status`·`created_at`)을 최신순으로 조회. `X-User-Id` 헤더 필수. 쿼리 `limit`(1~100, 기본 20), `cursor`(직전 응답의 `next_cursor`), `status`(하나만). 응답 `{items, next_cursor}` |
+| `GET` | `/jobs/{job_id}` | 삭제되지 않은 자기 job 하나의 상세(생성 응답과 같은 모양: 템플릿·리소스 요약 포함) 조회. `X-User-Id` 헤더 필수. 남의 job·없는 job·삭제된 job·형식이 틀린 ID는 모두 404 `job_not_found` |
 
-- 에러 응답은 `{code, message}`이며 400·404·500만 쓴다. 요청 형식 오류는 필드별 `code`(`invalid_image`, `invalid_port` 등)로 구분한다. 상세: [specs/002-api-job-create/contracts/post-jobs.md](specs/002-api-job-create/contracts/post-jobs.md), [specs/003-api-job-list/contracts/get-jobs.md](specs/003-api-job-list/contracts/get-jobs.md)
+- 에러 응답은 `{code, message}`이며 400·404·500만 쓴다. 요청 형식 오류는 필드별 `code`(`invalid_image`, `invalid_port` 등)로 구분한다. 상세: [specs/002-api-job-create/contracts/post-jobs.md](specs/002-api-job-create/contracts/post-jobs.md), [specs/003-api-job-list/contracts/get-jobs.md](specs/003-api-job-list/contracts/get-jobs.md), [specs/004-api-job-get/contracts/get-job.md](specs/004-api-job-get/contracts/get-job.md)
 
 ## 개발
 ```bash

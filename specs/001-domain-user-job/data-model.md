@@ -18,6 +18,8 @@
 | `updated_at` | `datetime` (UTC) | O | 마지막 변경 시각 | 서버 |
 | `deleted_at` | `datetime \| None` (UTC) | | 삭제 시각. 삭제 전에는 `None` | 서버 |
 
+- **시각**: 모두 UTC, 밀리초 단위. service가 시각을 만들 때 밀리초로 자른다(MongoDB 저장 정밀도와 같게 해 생성 응답과 조회 응답이 같다).
+
 - **인덱스·유니크 제약**
   - `uniq_owner_name`: `{owner_id: 1, name: 1}` 유니크, `partialFilterExpression: {is_deleted: false}`. 삭제되지 않은 job끼리만 이름 중복을 막는다. 삭제된 job의 이름은 다시 쓸 수 있다.
   - `uniq_owner_slot`: `{owner_id: 1, quota_slot: 1}` 유니크, `partialFilterExpression: {is_deleted: false}`. 개수 한도를 동시 요청에서도 지킨다.
@@ -138,5 +140,6 @@
 - `K8sService`: 주입 구조만 두고 호출하지 않는다.
 
 ## 다른 기능에 넘기는 규칙
+- **모든 쓰기 — 시각**: `user_jobs`에 쓰는 시각(`created_at`·`updated_at`·`deleted_at`, 이후 operator가 더하는 시각 포함)은 `user_job_service._now()`(UTC, 밀리초)로만 만든다. `datetime.now()`를 그대로 쓰면 저장 직후 응답(마이크로초)과 이후 조회 응답(밀리초)이 달라진다. operator처럼 service 밖에서 쓰는 경로가 생기면 시각을 repository에서 맞출지 그 기능의 plan에서 정한다.
 - **operator — 이름 재사용과 정리 순서**: job을 지운 직후 같은 이름으로 다시 만들면 옛 리소스가 아직 클러스터에 남아 있을 수 있다. operator는 apply 전에 같은 이름의 리소스가 다른 `user-job-id` 라벨을 갖고 있으면 apply하지 않고 다음 resync까지 미룬다(옛 job 정리를 기다림). API는 이를 위해 바뀌지 않는다. 상세는 `component-job-operator`에서 정한다.
 - **operator — selector**: selector가 `app.kubernetes.io/name`뿐이라 지운 job과 같은 이름의 새 job이 서로의 Pod를 고를 수 있다. 위 규칙으로 두 job의 리소스가 동시에 존재하지 않게 막는다.
