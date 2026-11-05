@@ -1,4 +1,6 @@
-# IMPLEMENT: job 생성 API
+# 구현 기록: job 생성 API
+
+> 2026-11-06 `docs/api-job-create/implement.md`에서 이관. 아래 기록의 `docs/...` 경로, `T1` 같은 번호(= `T001`), 파일 이름(`models/user_job.py` → 지금 `user_job_models.py`, `schemas/job.py` → `job_request.py`·`job_response.py` 등), `docs/fastapi-sdd-template.md`(→ `.claude/stacks/fastapi.md`)는 당시 기준이다.
 
 ## 진행 기록
 - ▶ 1단계 (병렬) T1, T2 시작 — 형식 타입·템플릿 모델, ErrorEnum·검증 에러 매핑(이후 작업의 기반)

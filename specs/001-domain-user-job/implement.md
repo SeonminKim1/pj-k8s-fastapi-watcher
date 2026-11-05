@@ -1,4 +1,6 @@
-# IMPLEMENT: user-job 도메인 모델
+# 구현 기록: user-job 도메인 모델
+
+> 2026-11-06 `docs/domain-user-job/implement.md`에서 이관. 아래 기록의 `docs/...` 경로, `T1` 같은 번호(= `T001`), 파일 이름(`models/user_job.py` → 지금 `user_job_models.py`, `schemas/job.py` → `job_request.py`·`job_response.py` 등), `docs/fastapi-sdd-template.md`(→ `.claude/stacks/fastapi.md`)는 당시 기준이다.
 
 ## 진행 기록
 - ▶ 1단계 (병렬) T1, T2 시작 — 모델·에러 정의, MongoDB 비동기 전환·K8sService 주입 구조
