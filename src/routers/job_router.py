@@ -8,6 +8,7 @@ from src.schemas.error_response import COMMON_ERROR_RESPONSES, NOT_FOUND_RESPONS
 from src.schemas.job_request import (
     JOB_CREATE_EXAMPLES,
     JobCreateRequest,
+    JobIdPath,
     JobListRequest,
     job_list_request,
 )
@@ -76,7 +77,7 @@ async def list_jobs(
     },
 )
 async def get_job(
-    job_id: str,
+    job_id: JobIdPath,
     user_id: UserIdHeader,
     service: Annotated[UserJobService, Depends(get_user_job_service)],
 ) -> JobResponse:

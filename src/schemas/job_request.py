@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from fastapi import Query, Request
+from fastapi import Path, Query, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,6 +16,18 @@ from src.models.user_job_models import (
 from src.schemas.common_request import UserIdHeader
 
 # /jobs 요청 schema. 응답은 job_response.py.
+
+# GET /jobs/{job_id}의 path 파라미터. 형식을 검사하지 않는다(틀린 ID도 service가 job_not_found로 응답).
+JOB_ID_EXAMPLES: dict[str, dict[str, Any]] = {
+    "job": {"summary": "생성·목록 응답의 id", "value": "6720a1b2c3d4e5f6a7b8c9d0"},
+}
+JobIdPath = Annotated[
+    str,
+    Path(
+        description="job ID(POST /jobs·GET /jobs 응답의 id). 남의 job·없는 ID·형식이 틀린 ID는 모두 404",
+        openapi_examples=JOB_ID_EXAMPLES,
+    ),
+]
 
 
 class JobCreateRequest(BaseModel):

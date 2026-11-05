@@ -10,7 +10,11 @@ from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.main import app
 from src.models.enums import JobStatus
 from src.models.user_job_models import JobPage, UserJob, WebTemplate
-from src.schemas.job_request import JOB_CREATE_EXAMPLES, JOB_LIST_CURSOR_EXAMPLE
+from src.schemas.job_request import (
+    JOB_CREATE_EXAMPLES,
+    JOB_ID_EXAMPLES,
+    JOB_LIST_CURSOR_EXAMPLE,
+)
 from src.schemas.job_response import (
     JOB_LIST_RESPONSE_EXAMPLE,
     JOB_RESPONSE_EXAMPLE,
@@ -523,3 +527,14 @@ def test_openapi_get_job_example_is_valid() -> None:
     op = client.get("/openapi.json").json()["paths"]["/jobs/{job_id}"]["get"]
     example = op["responses"]["200"]["content"]["application/json"]["example"]
     JobResponse.model_validate(example)
+
+
+# /docs·/redoc: job_id path 파라미터에 설명과 example이 있고, example 값으로 요청하면 200이다
+def test_openapi_get_job_path_param(service: FakeUserJobService) -> None:
+    op = client.get("/openapi.json").json()["paths"]["/jobs/{job_id}"]["get"]
+    (param,) = [p for p in op["parameters"] if p["name"] == "job_id"]
+    assert param["description"]
+    assert param["examples"] == JOB_ID_EXAMPLES
+    job_id = JOB_ID_EXAMPLES["job"]["value"]
+    assert client.get(f"/jobs/{job_id}", headers=HEADERS).status_code == 200
+    assert service.get_calls == [("alice", job_id)]

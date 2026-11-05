@@ -26,7 +26,7 @@
 
 ## Phase 5: 리뷰 반영
 `/code-review` 지적 5건 중 4건. 소유자 확인 위치(get_job은 Python, soft_delete는 쿼리)는 삭제 API에서 맞춘다(implement.md 메모).
-- [ ] T006 `job_id` path 파라미터 설명·example(`JobIdPath`, `JOB_ID_EXAMPLES`) + 테스트(OpenAPI 파라미터 설명·example, example 값으로 200) — `src/schemas/job_request.py`, `src/routers/job_router.py`, `tests/test_job_router.py` — 선행: T005
+- [x] T006 `job_id` path 파라미터 설명·example(`JobIdPath`, `JOB_ID_EXAMPLES`) + 테스트(OpenAPI 파라미터 설명·example, example 값으로 200) — `src/schemas/job_request.py`, `src/routers/job_router.py`, `tests/test_job_router.py` — 선행: T005
 - [ ] T007 `NOT_FOUND_RESPONSES` → `JOB_NOT_FOUND_RESPONSES`(job 전용임이 이름에 드러나게) — `src/schemas/error_response.py`, `src/routers/job_router.py`, `CLAUDE.md` — 선행: T006
 - [ ] T008 밀리초 테스트를 결정적으로: 서버 시각을 `…123456`으로 고정해 `…123000`이 되는지, 생성 결과와 다시 읽은 값이 같은지 — `tests/test_user_job_service.py` — 선행: T005
 - [ ] T009 시각은 `_now()`로만 만든다는 규칙을 "다른 기능에 넘기는 규칙"에 추가 — `specs/001-domain-user-job/data-model.md` — 선행: T008

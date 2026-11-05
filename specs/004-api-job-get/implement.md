@@ -19,6 +19,9 @@
 - ✔ T005 완료 — `CLAUDE.md`. pytest 296 passed
 - ■ 수렴 phase 완료 — 다음: `/sdd-speckit-converge`
 - converge: ✅ 수렴 — 다음: `/code-review`
+- `/code-review`: 버그 0건, 지적 5건 → 리뷰 반영 phase T006~T009 추가
+- ▶ 리뷰 반영 phase (순차) T006 시작 — `job_id` path 파라미터 설명·example
+- ✔ T006 완료 — `src/schemas/job_request.py`(`JobIdPath`, `JOB_ID_EXAMPLES`), `src/routers/job_router.py`, `tests/test_job_router.py`. pytest 297 passed
 
 ## spec과 달라진 점
 - 없음
