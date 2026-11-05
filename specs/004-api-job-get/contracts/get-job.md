@@ -8,7 +8,7 @@
 | 필드 | 위치 | 타입 | 필수 | 기본값 | 설명 |
 |---|---|---|---|---|---|
 | `X-User-Id` | header | `str` | O | | `CLAUDE.md` 유저 ID 형식(소문자·숫자·`-`, 영숫자로 시작·끝, 1~58자). 공용 `UserIdHeader` |
-| `job_id` | path | `str` | O | | job ID(생성·목록 응답의 `id`). 형식을 검사하지 않는다(틀리면 없음) |
+| `job_id` | path | `str` | O | | job ID(생성·목록 응답의 `id`). 형식을 검사하지 않는다(틀리면 없음). 공용 `JobIdPath`(`src/schemas/job_request.py`, example `JOB_ID_EXAMPLES`) |
 
 - 요청 예: `GET /jobs/6720a1b2c3d4e5f6a7b8c9d0`
 

@@ -11,7 +11,7 @@
 - **검토한 대안**: 상세 전용 `JobDetailResponse` — 지금은 항목이 같아 중복이다.
 
 ## 404 응답 문서
-- **결정**: `src/schemas/error_response.py`에 `NOT_FOUND_RESPONSES`(404: `ErrorResponse` + `job_not_found` example)를 두고 `GET /jobs/{job_id}`에만 붙인다. 400·500은 라우터 공통(`COMMON_ERROR_RESPONSES`) 그대로.
+- **결정**: `src/schemas/error_response.py`에 `JOB_NOT_FOUND_RESPONSES`(404: `ErrorResponse` + `job_not_found` example)를 두고 `GET /jobs/{job_id}`에만 붙인다. 400·500은 라우터 공통(`COMMON_ERROR_RESPONSES`) 그대로.
 - **근거**: 스택 파일 "API 문서"의 에러 응답 규칙: 라우터의 모든 엔드포인트가 돌려주는 것(400·500)은 `APIRouter(responses=...)`로 한 번, 일부 엔드포인트만 돌려주는 것(404)은 그 엔드포인트에 붙이고, `/docs`에는 실제로 돌려주는 상태 코드만 보인다. 404는 이 엔드포인트만 돌려준다.
 - **검토한 대안**: 라우터 공통에 404 추가 — `POST /jobs`·`GET /jobs`에 나지 않는 404가 문서에 보인다.
 

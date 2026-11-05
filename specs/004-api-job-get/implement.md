@@ -34,5 +34,7 @@
 
 ## 메모
 - 이슈 트래커: 이 기능은 이슈를 만들지 않는다(tasks.md).
+- 리뷰 보류(삭제 API에서): `get_job`은 `_id`로 읽은 뒤 Python에서 소유자를 확인하고, `soft_delete`는 쿼리 조건에 `owner_id`를 넣는다. 같은 규칙을 두 방식으로 지킨다. 삭제 API를 만들 때 `find_active_by_owner_and_id`처럼 쿼리 한 곳으로 맞춘다.
+- converge 뒤 `/code-review`: 버그 0건, 지적 5건 → 4건은 Phase 5(T006~T009), 1건은 위 보류.
 - quickstart 확인(T002): 1) 200, 생성 응답과 본문이 같음 2) 남의 job·형식은 맞지만 없는 ID·`abc` 모두 404 `job_not_found`, 같은 본문 3) 헤더 없음 400 `invalid_user_id` 4) `/jobs/{job_id}`만 404 문서, 200·404 example. 삭제된 job은 삭제 API가 없어 직접 호출하지 않고 service 테스트(`test_get_job_not_found[deleted]`)로 확인한다.
 - 첫 확인에서 생성 응답 시각(마이크로초)과 조회 응답 시각(MongoDB 밀리초)이 달라 T003을 추가했다. 가짜 repository를 쓰는 단위 테스트로는 드러나지 않는 차이였다.

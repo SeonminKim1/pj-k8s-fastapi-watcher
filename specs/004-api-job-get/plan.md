@@ -21,7 +21,7 @@
 | III. 테스트 | 소유권·없음·삭제됨·잘못된 ID는 기존 service 테스트(`test_get_job_not_found`)가 다룬다. router 테스트로 200·404·400·문서 확인 | 통과 |
 | IV. 에러 표현 | 새 `ErrorEnum` 없음. `JOB_NOT_FOUND` 404, `INVALID_USER_ID` 400. 에러 표는 [contracts/get-job.md](contracts/get-job.md) | 통과 |
 | V. 단순함 | 응답 schema·service 재사용, 새 모델 없음 | 통과 |
-| 스택: API 문서(에러 응답) | 400·500은 라우터 공통 `COMMON_ERROR_RESPONSES`, 이 엔드포인트만 돌려주는 404는 엔드포인트의 `responses`에 `NOT_FOUND_RESPONSES`. 200·404 example은 schema 모듈 상수 | 통과 |
+| 스택: API 문서(에러 응답) | 400·500은 라우터 공통 `COMMON_ERROR_RESPONSES`, 이 엔드포인트만 돌려주는 404는 엔드포인트의 `responses`에 `JOB_NOT_FOUND_RESPONSES`. 200·404 example과 `job_id` 설명·example은 schema 모듈 상수 | 통과 |
 | 스택: 레이어(라우터 반환) | `models/` 객체가 아니라 `JobResponse` 반환 | 통과 |
 | `CLAUDE.md`: 에러 상태 코드 | 남의 리소스는 404로 없음과 같게 | 통과 |
 | `CLAUDE.md`: operator 패턴 | MongoDB만 읽음 | 통과 |
@@ -29,11 +29,12 @@
 ## 프로젝트 구조 (Project Structure)
 
 ### 변경 파일 (Source Code)
-- `src/schemas/error_response.py`: `NOT_FOUND_RESPONSES`(404: `ErrorResponse` + `job_not_found` example) 추가. `COMMON_ERROR_RESPONSES` 주석의 code 목록 기준을 "각 기능의 contracts 에러 표"로
+- `src/schemas/job_request.py`: path 파라미터 타입 `JobIdPath`(`Path(description=..., openapi_examples=JOB_ID_EXAMPLES)`)와 example 상수 `JOB_ID_EXAMPLES`
+- `src/schemas/error_response.py`: `JOB_NOT_FOUND_RESPONSES`(404: `ErrorResponse` + `job_not_found` example) 추가. `COMMON_ERROR_RESPONSES` 주석의 code 목록 기준을 "각 기능의 contracts 에러 표"로
 - `src/models/`: 없음
 - `src/repository/`: 없음
 - `src/services/user_job_service.py`: 서버 시각 `_now()`(UTC, 밀리초로 자름)를 생성·상태 갱신·삭제에 쓴다. 생성 응답과 조회 응답의 시각이 같아지도록(US1/AC1, `specs/001-domain-user-job/data-model.md` "시각")
-- `src/routers/job_router.py`: `GET /jobs/{job_id}`(`response_model=JobResponse`, `description`에 contracts 경로, `responses`에 200 example `JOB_RESPONSE_EXAMPLE`과 `NOT_FOUND_RESPONSES`)
+- `src/routers/job_router.py`: `GET /jobs/{job_id}`(`response_model=JobResponse`, `description`에 contracts 경로, `responses`에 200 example `JOB_RESPONSE_EXAMPLE`과 `JOB_NOT_FOUND_RESPONSES`, `job_id: JobIdPath`)
 - `src/core/`, `src/main.py`: 없음
 - `tests/test_user_job_service.py`: 생성·상태 갱신·삭제 시각이 밀리초 단위인지
 - `tests/test_job_router.py`: 가짜 service에 `get_job`. 200 응답 형태·전달 인자, `JOB_NOT_FOUND` 404 본문, 헤더 없음·형식 오류 400(service 미호출), OpenAPI(200·400·404·500, 404 example, 다른 엔드포인트에 404 없음, 200 example이 `JobResponse`로 검증)
