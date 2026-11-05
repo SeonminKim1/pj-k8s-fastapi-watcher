@@ -18,6 +18,7 @@
 - ▶ 수렴 phase (순차) T005 시작 — `CLAUDE.md` 고유 모듈에 404 문서
 - ✔ T005 완료 — `CLAUDE.md`. pytest 296 passed
 - ■ 수렴 phase 완료 — 다음: `/sdd-speckit-converge`
+- converge: ✅ 수렴 — 다음: `/code-review`
 
 ## spec과 달라진 점
 - 없음
@@ -29,7 +30,7 @@
 - [x] `/redoc`에서 요청·응답 example이 실제 값으로 보이는지 확인 (OpenAPI JSON의 200·404 example로 확인, `/redoc` 200. 브라우저로는 열어 보지 않음)
 - [x] `uv run pytest` 통과 (296 passed. 없음 4경우는 service 테스트, 404·400·문서는 router 테스트)
 - [x] README 등 관련 문서 갱신
-- [ ] tasks.md 모두 완료, converge `✅ 수렴`
+- [x] tasks.md 모두 완료, converge `✅ 수렴` (두 번째 converge, 남은 일 0건)
 
 ## 메모
 - 이슈 트래커: 이 기능은 이슈를 만들지 않는다(tasks.md).
