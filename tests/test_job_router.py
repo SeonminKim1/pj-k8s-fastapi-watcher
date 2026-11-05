@@ -49,7 +49,7 @@ class FakeUserJobService:
         self.calls.append((owner_id, name, template))
         if self.error is not None:
             raise MyApiError(self.error)
-        return make_job(owner_id, name, template)
+        return make_job(owner_id=owner_id, name=name, template=template)
 
 
 # 응답 변환을 확인할 수 있게 실제 모양을 갖춘 UserJob을 만든다.
@@ -69,7 +69,7 @@ def make_job(
         namespace=namespace,
         name=name,
         template=template,
-        resources=build_resources(name, namespace, template),
+        resources=build_resources(name=name, namespace=namespace, template=template),
         quota_slot=0,
         status=status,
         is_deleted=False,

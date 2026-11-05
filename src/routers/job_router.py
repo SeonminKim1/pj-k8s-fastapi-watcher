@@ -37,7 +37,9 @@ async def create_job(
     user_id: UserIdHeader,
     service: Annotated[UserJobService, Depends(get_user_job_service)],
 ) -> JobResponse:
-    job = await service.create_job(user_id, body.name, body.template)
+    job = await service.create_job(
+        owner_id=user_id, name=body.name, template=body.template
+    )
     return JobResponse.from_job(job)
 
 
@@ -55,6 +57,9 @@ async def list_jobs(
     service: Annotated[UserJobService, Depends(get_user_job_service)],
 ) -> JobListResponse:
     page = await service.list_jobs(
-        query.user_id, query.limit, query.cursor, query.status
+        owner_id=query.user_id,
+        limit=query.limit,
+        cursor=query.cursor,
+        status=query.status,
     )
     return JobListResponse.from_page(page)

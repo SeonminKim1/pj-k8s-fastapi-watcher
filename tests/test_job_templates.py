@@ -18,7 +18,9 @@ def by_kind(resources: list[JobResource], kind: str) -> JobResource:
 
 
 def build(**fields: Any) -> list[JobResource]:
-    return build_resources("my-web", "user-alice", web(**fields))
+    return build_resources(
+        name="my-web", namespace="user-alice", template=web(**fields)
+    )
 
 
 def container(resources: list[JobResource]) -> dict[str, Any]:

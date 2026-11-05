@@ -61,7 +61,7 @@ class UserJobService:
         _validate_user_id(owner_id)
         _validate_job_name(name)
         namespace = f"user-{owner_id}"
-        resources = build_resources(name, namespace, template)
+        resources = build_resources(name=name, namespace=namespace, template=template)
         now = datetime.now(UTC)
         job_doc = {
             "owner_id": owner_id,
@@ -97,7 +97,7 @@ class UserJobService:
         _validate_limit(limit)
         after = decode_cursor(cursor) if cursor is not None else None
         jobs = await self.repository.find_active_page(
-            owner_id, status, after, limit + 1
+            owner_id=owner_id, status=status, after=after, limit=limit + 1
         )
         if len(jobs) <= limit:
             return JobPage(items=jobs, next_cursor=None)
@@ -121,7 +121,10 @@ class UserJobService:
             s for s, targets in ALLOWED_STATUS_TRANSITIONS.items() if status in targets
         ]
         updated = await self.repository.update_status_from(
-            job_id, sources, status, datetime.now(UTC)
+            job_id=job_id,
+            from_statuses=sources,
+            to_status=status,
+            now=datetime.now(UTC),
         )
         if updated is not None:
             return updated
@@ -135,6 +138,8 @@ class UserJobService:
     # 자기 job을 soft delete한다. 클러스터 리소스 정리는 operator가 한다.
     async def delete_job(self, owner_id: str, job_id: str) -> None:
         _validate_user_id(owner_id)
-        deleted = await self.repository.soft_delete(owner_id, job_id, datetime.now(UTC))
+        deleted = await self.repository.soft_delete(
+            owner_id=owner_id, job_id=job_id, now=datetime.now(UTC)
+        )
         if not deleted:
             raise MyApiError(ErrorEnum.JOB_NOT_FOUND)

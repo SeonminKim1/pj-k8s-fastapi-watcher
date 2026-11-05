@@ -108,6 +108,7 @@ tar -cf - docs/fastapi-sdd-template.md sdd-process.md .claude/skills/feat .claud
 - lint·포맷은 `ruff`만 쓴다(`black`/`flake8`/`isort` 금지).
 - 타입 힌트 필수. 모든 public 함수는 return type을 명시한다.
 - 함수/변수는 snake_case.
+- 프로젝트에서 정의한 함수에 인자를 3개 이상 넘길 때는 키워드 인자로 쓴다(예: `service.list_jobs(owner_id=..., limit=..., cursor=..., status=...)`). 위치만 보고 어느 값이 어느 인자인지 헷갈리지 않게 하기 위함이다. 표준·외부 라이브러리 호출(`datetime(...)`, `monkeypatch.setattr(...)` 등)은 제외한다. 함수를 담는 dict·변수의 타입은 `Callable` 대신 인자 이름이 있는 `Protocol`로 둔다(`Callable`은 키워드 호출을 표현하지 못한다).
 - 검증 함수 이름: 틀리면 예외를 던지는 함수는 `validate_<대상>`(예: `validate_user_id`), 참/거짓만 돌려주는 함수는 `is_<대상>`(예: `is_user_id`).
 - 모든 함수와 복잡한 로직에는 짧지만 빠른 이해에 도움이 되는 주석을 단다.
 - `models/`·`schemas/`의 Pydantic 필드에는 `Field(description=...)`로 설명을 단다(의미, 형식·제약, 누가 값을 정하는지). `schemas/`의 설명은 `/docs`에 그대로 노출된다.
