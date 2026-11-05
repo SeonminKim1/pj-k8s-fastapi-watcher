@@ -4,7 +4,7 @@ import re
 from datetime import UTC, datetime
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
-from src.models.user_job import JobPosition
+from src.models.user_job_models import JobPosition
 
 # job 목록 cursor ↔ 정렬 위치(created_at, id) 변환(docs/api-job-list/plan.md "cursor 인코딩").
 # 형식: base64url("<created_at isoformat>|<id>"), padding 없음. 클라이언트에게는 불투명 문자열이다.

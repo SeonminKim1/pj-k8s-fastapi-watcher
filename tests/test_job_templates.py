@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from src.models.user_job import JobResource, WebTemplate
+from src.models.user_job_models import JobResource, WebTemplate
 from src.services.job_templates import KINDS_BY_TYPE, SIZE_PRESETS, build_resources
 
 LABELS = {"app.kubernetes.io/name": "my-web"}

@@ -12,7 +12,7 @@ class JobStatus(StrEnum):
 
 
 class JobType(StrEnum):
-    """job 템플릿 타입. 타입을 추가하면 템플릿 모델(models/user_job.py)과 생성 함수(services/job_templates.py)도 함께 늘린다."""
+    """job 템플릿 타입. 타입을 추가하면 템플릿 모델(models/user_job_models.py)과 생성 함수(services/job_templates.py)도 함께 늘린다."""
 
     WEB = "web"
 

@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from src.models.enums import JobStatus
-from src.models.user_job import JobPage, JobTemplate, UserJob
+from src.models.user_job_models import JobPage, JobTemplate, UserJob
 
 # /jobs 응답 schema. 요청은 job_request.py.
 

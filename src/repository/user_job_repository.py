@@ -9,7 +9,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
 from src.models.enums import JobStatus
-from src.models.user_job import JobPosition, UserJob
+from src.models.user_job_models import JobPosition, UserJob
 
 
 class DuplicateJobNameError(Exception):

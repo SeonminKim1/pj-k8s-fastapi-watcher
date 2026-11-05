@@ -6,7 +6,7 @@ import pytest
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.models.enums import JobStatus
-from src.models.user_job import (
+from src.models.user_job_models import (
     JOB_LIST_DEFAULT_LIMIT,
     JOB_LIST_MAX_LIMIT,
     MAX_JOBS_PER_USER,

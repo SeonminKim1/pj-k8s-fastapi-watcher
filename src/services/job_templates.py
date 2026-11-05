@@ -1,7 +1,7 @@
 from typing import Any, Protocol
 
 from src.models.enums import JobSize, JobType
-from src.models.user_job import JobResource, JobTemplate, WebTemplate
+from src.models.user_job_models import JobResource, JobTemplate, WebTemplate
 
 # 템플릿 입력 → 매니페스트 생성. 유저가 정하지 않는 값(라벨, 리소스, 보안 설정 등)은 여기서 고정한다.
 # 타입을 추가하면 생성 함수 하나와 _BUILDERS·KINDS_BY_TYPE 한 줄씩을 더한다.

@@ -144,9 +144,22 @@ def test_openapi_docs() -> None:
 | `src/schemas/` | 라우터의 요청/응답 Pydantic 모델. 리소스당 요청·응답 모듈을 나눈다(`routers/<name>_router.py` ↔ `schemas/<name>_request.py`·`schemas/<name>_response.py`). 여러 라우터가 함께 쓰는 것은 `common_request.py`(공통 헤더 등)·`error_response.py`(에러 응답). 모델만으로 검증할 수 없는 요청 파싱(예: 같은 쿼리 중복 지정 거절)은 그 요청 모듈에 dependency 함수로 두고, 결과를 요청 모델로 돌려준다 | 라우터가 참조하는 모델은 이것뿐 |
 | `src/services/` | 비즈니스 로직(검증/변환). 영속화는 `repository/`로, 외부 클라이언트는 직접 호출. 도메인 객체 또는 완성된 응답 객체 반환 | `routers/` import |
 | `src/repository/` | DB 접근(쿼리/CRUD)만 | `routers/`·`services/` 호출 |
-| `src/models/` | 내부/도메인 모델, DB document 모델(`schemas/`와 구분) | |
+| `src/models/` | 내부/도메인 모델, DB document 모델(`schemas/`와 구분). 도메인 하나의 모델은 `<도메인>_models.py`(아래 "파일 이름") | |
 | `src/core/` | 공통 인프라: DB 연결(`core/db`), 예외(`core/exception`) 등 | |
 | `src/main.py` | 앱 엔트리포인트(`app = FastAPI()`), 라우터·예외 핸들러 등록 | |
+
+**파일 이름**: 파일 이름만 보고 레이어와 역할을 알 수 있게 접미사를 붙인다. `<name>`은 snake_case 단수(예: `job`, `user_job`).
+
+| 위치 | 파일 이름 | 예 |
+|---|---|---|
+| `src/routers/` | `<name>_router.py` | `job_router.py` |
+| `src/schemas/` | `<name>_request.py`, `<name>_response.py` | `job_request.py`, `job_response.py` |
+| `src/services/` | `<name>_service.py` (비즈니스 로직 클래스, 외부 시스템 래퍼) | `user_job_service.py`, `k8s_service.py` |
+| `src/repository/` | `<name>_repository.py` | `user_job_repository.py` |
+| `src/models/` | `<도메인>_models.py`: DB document 모델과 그 도메인에 딸린 모델(입력 템플릿, 페이지 등)을 함께 둔다. 도메인 이름은 컬렉션 이름의 단수 | `user_job_models.py` (컬렉션 `user_jobs`) |
+| `tests/` | `test_<대상 모듈 이름>.py` | `test_user_job_models.py` |
+
+- 접미사 규칙의 예외: 여러 도메인이 함께 쓰는 정의는 내용으로 이름 짓는다(`models/enums.py`, `models/k8s_names.py`). 클래스·주입 없이 import하는 순수 함수 모듈은 `<대상>_<역할>.py`로 짓는다(`services/job_templates.py`, `services/job_cursor.py`). 이 경우 `_service`를 붙이지 않는다(주입하는 service 클래스와 구분).
 
 - 외부 시스템 클라이언트는 `services/<name>_service.py`의 클래스 하나로 감싸고, 다른 service는 그 클래스를 통해서만 호출한다.
 - 라우터가 없는 백그라운드 컴포넌트(watch, 스케줄러 등)도 DB는 `repository/`, 외부 시스템은 래퍼 클래스를 통해서만 접근한다.

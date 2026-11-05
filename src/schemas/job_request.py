@@ -8,7 +8,7 @@ from src.core.exception.my_exception import ErrorEnum
 from src.core.exception.validation_error import error_code
 from src.models.enums import JobStatus
 from src.models.k8s_names import DnsLabel1035
-from src.models.user_job import (
+from src.models.user_job_models import (
     JOB_LIST_DEFAULT_LIMIT,
     JOB_LIST_MAX_LIMIT,
     JobTemplate,

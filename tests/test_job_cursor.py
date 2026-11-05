@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 
 from src.core.exception.my_exception import ErrorEnum, MyApiError
-from src.models.user_job import JobPosition
+from src.models.user_job_models import JobPosition
 from src.services.job_cursor import decode_cursor, encode_cursor
 
 JOB_ID = "6720a1b2c3d4e5f6a7b8c9d0"

@@ -9,7 +9,7 @@ from src.core.dependencies import get_user_job_service
 from src.core.exception.my_exception import ErrorEnum, MyApiError
 from src.main import app
 from src.models.enums import JobStatus
-from src.models.user_job import JobPage, UserJob, WebTemplate
+from src.models.user_job_models import JobPage, UserJob, WebTemplate
 from src.schemas.job_request import JOB_CREATE_EXAMPLES, JOB_LIST_CURSOR_EXAMPLE
 from src.schemas.job_response import (
     JOB_LIST_RESPONSE_EXAMPLE,
