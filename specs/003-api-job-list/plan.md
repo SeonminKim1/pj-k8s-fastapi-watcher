@@ -50,4 +50,4 @@
 
 ## 리스크 / 확인 필요
 - **repository는 자동 테스트가 없다**. `$or` 위치 조건과 `(created_at, _id)` 정렬, 같은 `created_at` 문서가 페이지 사이에서 빠지거나 겹치지 않는지는 로컬 MongoDB 임시 DB로 확인했다(`implement.md`). 확인 스크립트는 scratchpad에 두고 확인 후 지운다.
-- **MongoDB 시각 정밀도**: 밀리초까지만 저장한다. cursor는 항상 DB에서 읽은 값으로 만들므로 왕복이 정확하다. 가짜 repository는 마이크로초 값을 갖지만 같은 값을 비교하므로 테스트에 영향이 없다.
+- **MongoDB 시각 정밀도**: 밀리초까지만 저장한다. 서버 시각도 밀리초로 만들고(`specs/001-domain-user-job/data-model.md` "시각"), cursor는 DB에서 읽은 값으로 만들므로 왕복이 정확하다. 가짜 repository도 service가 넘긴 밀리초 값을 그대로 가진다.
