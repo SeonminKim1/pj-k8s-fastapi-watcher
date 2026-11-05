@@ -24,6 +24,8 @@
 - ✔ T006 완료 — `src/schemas/job_request.py`(`JobIdPath`, `JOB_ID_EXAMPLES`), `src/routers/job_router.py`, `tests/test_job_router.py`. pytest 297 passed
 - ▶ 리뷰 반영 phase (순차) T007 시작 — 404 문서 이름을 job 전용으로
 - ✔ T007 완료 — `JOB_NOT_FOUND_RESPONSES`(`src/schemas/error_response.py`, `src/routers/job_router.py`, `CLAUDE.md`). 동작 변화 없음, pytest 297 passed
+- ▶ 리뷰 반영 phase (순차) T008 시작 — 밀리초 테스트를 결정적으로
+- ✔ T008 완료 — `tests/test_user_job_service.py`(`_FixedClock`으로 `…123456` → `…123000`, 생성 결과 = 다시 읽은 값). `_now()` 자르기를 빼면 실패함을 확인, pytest 297 passed
 
 ## spec과 달라진 점
 - 없음
