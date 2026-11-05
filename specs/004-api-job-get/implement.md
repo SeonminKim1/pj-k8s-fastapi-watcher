@@ -26,6 +26,9 @@
 - ✔ T007 완료 — `JOB_NOT_FOUND_RESPONSES`(`src/schemas/error_response.py`, `src/routers/job_router.py`, `CLAUDE.md`). 동작 변화 없음, pytest 297 passed
 - ▶ 리뷰 반영 phase (순차) T008 시작 — 밀리초 테스트를 결정적으로
 - ✔ T008 완료 — `tests/test_user_job_service.py`(`_FixedClock`으로 `…123456` → `…123000`, 생성 결과 = 다시 읽은 값). `_now()` 자르기를 빼면 실패함을 확인, pytest 297 passed
+- ▶ 리뷰 반영 phase (순차) T009 시작 — 시각 규칙을 001 "다른 기능에 넘기는 규칙"에
+- ✔ T009 완료 — `specs/001-domain-user-job/data-model.md`. pytest 297 passed
+- ■ 리뷰 반영 phase 완료 — 다음: `/sdd-speckit-converge`
 
 ## spec과 달라진 점
 - 없음
