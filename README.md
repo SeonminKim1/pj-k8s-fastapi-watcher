@@ -6,6 +6,7 @@
 
 ## 실행
 ```bash
+git submodule update --init   # .claude (ai-shared-dev-toolkit)
 uv sync
 uv run uvicorn src.main:app --reload
 ```
@@ -32,6 +33,7 @@ uv run ruff check . && uv run ruff format .
 uv run pytest                                   # 전체 테스트
 uv run pytest tests/test_main.py::test_openapi_docs   # 단일 테스트
 ```
-- 코드 규칙: [docs/fastapi-sdd-template.md](docs/fastapi-sdd-template.md)
-- 개발 프로세스: [sdd-process.md](sdd-process.md)
+- 코드 규칙: [.claude/stacks/fastapi.md](.claude/stacks/fastapi.md)
+- 개발 프로세스(SDD): [.claude/skills/sdd-feat/process.md](.claude/skills/sdd-feat/process.md) — 기능은 `/sdd-feat`로 진행
+- `.claude/`는 [ai-shared-dev-toolkit](https://github.com/SeonminKim1/ai-shared-dev-toolkit) 서브모듈이다. clone 후 `git submodule update --init`
 
