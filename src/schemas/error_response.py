@@ -45,8 +45,8 @@ COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 
 _NOT_FOUND = ErrorEnum.JOB_NOT_FOUND
 
-# 404를 돌려주는 엔드포인트에만 붙이는 응답 문서(남의 job·없음·삭제됨·잘못된 ID).
-NOT_FOUND_RESPONSES: dict[int | str, dict[str, Any]] = {
+# job 없음(404)을 돌려주는 엔드포인트에만 붙이는 응답 문서(남의 job·없음·삭제됨·잘못된 ID). job 전용이다.
+JOB_NOT_FOUND_RESPONSES: dict[int | str, dict[str, Any]] = {
     404: _error_doc(
         "job 없음. 남의 job·삭제된 job·형식이 틀린 ID도 같은 응답",
         ErrorResponse(code=_NOT_FOUND.code, message=_NOT_FOUND.message),

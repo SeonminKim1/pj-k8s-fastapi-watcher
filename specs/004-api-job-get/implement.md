@@ -22,6 +22,8 @@
 - `/code-review`: 버그 0건, 지적 5건 → 리뷰 반영 phase T006~T009 추가
 - ▶ 리뷰 반영 phase (순차) T006 시작 — `job_id` path 파라미터 설명·example
 - ✔ T006 완료 — `src/schemas/job_request.py`(`JobIdPath`, `JOB_ID_EXAMPLES`), `src/routers/job_router.py`, `tests/test_job_router.py`. pytest 297 passed
+- ▶ 리뷰 반영 phase (순차) T007 시작 — 404 문서 이름을 job 전용으로
+- ✔ T007 완료 — `JOB_NOT_FOUND_RESPONSES`(`src/schemas/error_response.py`, `src/routers/job_router.py`, `CLAUDE.md`). 동작 변화 없음, pytest 297 passed
 
 ## spec과 달라진 점
 - 없음

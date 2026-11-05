@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, Depends
 
 from src.core.dependencies import get_user_job_service
 from src.schemas.common_request import UserIdHeader
-from src.schemas.error_response import COMMON_ERROR_RESPONSES, NOT_FOUND_RESPONSES
+from src.schemas.error_response import COMMON_ERROR_RESPONSES, JOB_NOT_FOUND_RESPONSES
 from src.schemas.job_request import (
     JOB_CREATE_EXAMPLES,
     JobCreateRequest,
@@ -73,7 +73,7 @@ async def list_jobs(
     description='에러 code: `specs/004-api-job-get/contracts/get-job.md` "에러"',
     responses={
         200: {"content": {"application/json": {"example": JOB_RESPONSE_EXAMPLE}}},
-        **NOT_FOUND_RESPONSES,
+        **JOB_NOT_FOUND_RESPONSES,
     },
 )
 async def get_job(
