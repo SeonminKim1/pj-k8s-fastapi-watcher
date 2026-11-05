@@ -4,6 +4,11 @@
 - ▶ 1단계 (순차) T001 시작 — 404 응답 문서와 `GET /jobs/{job_id}` 라우터, router 테스트. 기존 service·schema를 엔드포인트로 연결
 - ✔ T001 완료 — `src/schemas/error_response.py`(`NOT_FOUND_RESPONSES`), `src/routers/job_router.py`(`GET /jobs/{job_id}`), `tests/test_job_router.py`(8개). ruff 통과, pytest 295 passed
 - ■ 1단계 완료 — 다음: 2단계 T002 (README, quickstart 직접 확인, 완료 체크리스트)
+- ▶ 2단계 (순차) T002 시작 — README API 표, quickstart 직접 확인
+- ⏸ T002 중단 — spec에 없는 상황: quickstart 1에서 생성 응답 시각(마이크로초)과 조회 응답 시각(MongoDB 밀리초)이 다름. 사용자 결정: 서버 시각을 밀리초로 자른다 → 001 data-model·research, 004 plan·tasks(T003 추가)를 먼저 고침
+- ▶ 3단계 (순차) T003 시작 — 서버 시각을 밀리초로(생성·상태 갱신·삭제)
+- ✔ T003 완료 — `src/services/user_job_service.py`(`_now()`), `tests/test_user_job_service.py`(`test_times_are_milliseconds`). pytest 296 passed. 실제 앱에서 생성 응답 = 조회 응답 확인
+- ■ 3단계 완료 — 다음: T002 재개
 
 ## spec과 달라진 점
 - 없음

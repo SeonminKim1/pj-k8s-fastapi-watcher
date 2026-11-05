@@ -32,9 +32,10 @@
 - `src/schemas/error_response.py`: `NOT_FOUND_RESPONSES`(404: `ErrorResponse` + `job_not_found` example) 추가. `COMMON_ERROR_RESPONSES` 주석의 code 목록 기준을 "각 기능의 contracts 에러 표"로
 - `src/models/`: 없음
 - `src/repository/`: 없음
-- `src/services/`: 없음(`UserJobService.get_job` 사용)
+- `src/services/user_job_service.py`: 서버 시각 `_now()`(UTC, 밀리초로 자름)를 생성·상태 갱신·삭제에 쓴다. 생성 응답과 조회 응답의 시각이 같아지도록(US1/AC1, `specs/001-domain-user-job/data-model.md` "시각")
 - `src/routers/job_router.py`: `GET /jobs/{job_id}`(`response_model=JobResponse`, `description`에 contracts 경로, `responses`에 200 example `JOB_RESPONSE_EXAMPLE`과 `NOT_FOUND_RESPONSES`)
 - `src/core/`, `src/main.py`: 없음
+- `tests/test_user_job_service.py`: 생성·상태 갱신·삭제 시각이 밀리초 단위인지
 - `tests/test_job_router.py`: 가짜 service에 `get_job`. 200 응답 형태·전달 인자, `JOB_NOT_FOUND` 404 본문, 헤더 없음·형식 오류 400(service 미호출), OpenAPI(200·400·404·500, 404 example, 다른 엔드포인트에 404 없음, 200 example이 `JobResponse`로 검증)
 - 문서: `README.md` API 표에 `GET /jobs/{job_id}`, 에러 상세 링크에 contracts 추가
 
@@ -45,4 +46,4 @@
 - 없음
 
 ## 리스크 / 확인 필요
-- 없음. 읽기 전용이고 기존 service·schema를 그대로 쓴다.
+- 시각을 밀리초로 자르면 같은 밀리초 안에 만든 job은 `created_at`이 같다. 목록 정렬은 같은 시각이면 `id`로 순서를 정하므로(`specs/003-api-job-list/`) 영향이 없다.

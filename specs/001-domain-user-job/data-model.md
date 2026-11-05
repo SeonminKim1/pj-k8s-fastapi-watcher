@@ -18,6 +18,8 @@
 | `updated_at` | `datetime` (UTC) | O | 마지막 변경 시각 | 서버 |
 | `deleted_at` | `datetime \| None` (UTC) | | 삭제 시각. 삭제 전에는 `None` | 서버 |
 
+- **시각**: 모두 UTC, 밀리초 단위. service가 시각을 만들 때 밀리초로 자른다(MongoDB 저장 정밀도와 같게 해 생성 응답과 조회 응답이 같다).
+
 - **인덱스·유니크 제약**
   - `uniq_owner_name`: `{owner_id: 1, name: 1}` 유니크, `partialFilterExpression: {is_deleted: false}`. 삭제되지 않은 job끼리만 이름 중복을 막는다. 삭제된 job의 이름은 다시 쓸 수 있다.
   - `uniq_owner_slot`: `{owner_id: 1, quota_slot: 1}` 유니크, `partialFilterExpression: {is_deleted: false}`. 개수 한도를 동시 요청에서도 지킨다.

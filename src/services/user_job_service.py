@@ -23,6 +23,12 @@ from src.services.job_cursor import decode_cursor, encode_cursor
 from src.services.job_templates import build_resources
 
 
+# 서버 시각(UTC). MongoDB는 밀리초까지만 저장하므로 밀리초로 잘라, 저장 직후 응답과 이후 조회 응답이 같게 한다.
+def _now() -> datetime:
+    now = datetime.now(UTC)
+    return now.replace(microsecond=now.microsecond // 1000 * 1000)
+
+
 # 유저 ID 형식이 틀리면 INVALID_USER_ID(400). owner_id를 받는 모든 메서드의 첫 검사다.
 def _validate_user_id(owner_id: Any) -> None:
     if not is_user_id(owner_id):
@@ -62,7 +68,7 @@ class UserJobService:
         _validate_job_name(name)
         namespace = f"user-{owner_id}"
         resources = build_resources(name=name, namespace=namespace, template=template)
-        now = datetime.now(UTC)
+        now = _now()
         job_doc = {
             "owner_id": owner_id,
             "namespace": namespace,
@@ -124,7 +130,7 @@ class UserJobService:
             job_id=job_id,
             from_statuses=sources,
             to_status=status,
-            now=datetime.now(UTC),
+            now=_now(),
         )
         if updated is not None:
             return updated
@@ -139,7 +145,7 @@ class UserJobService:
     async def delete_job(self, owner_id: str, job_id: str) -> None:
         _validate_user_id(owner_id)
         deleted = await self.repository.soft_delete(
-            owner_id=owner_id, job_id=job_id, now=datetime.now(UTC)
+            owner_id=owner_id, job_id=job_id, now=_now()
         )
         if not deleted:
             raise MyApiError(ErrorEnum.JOB_NOT_FOUND)

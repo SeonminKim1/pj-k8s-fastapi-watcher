@@ -6,8 +6,9 @@
 - **검토한 대안**: 동기 `MongoClient` — async 라우터와 섞이면 루프를 막는다.
 
 ## 시각
-- **결정**: UTC aware `datetime`. 읽을 때도 `tz_aware=True`로 UTC aware.
-- **근거**: cursor·정렬·응답 직렬화에서 타임존이 흔들리지 않는다.
+- **결정**: UTC aware `datetime`, 밀리초 단위. service가 `datetime.now(UTC)`를 밀리초로 잘라 쓰고(`_now()`), 읽을 때도 `tz_aware=True`로 UTC aware.
+- **근거**: cursor·정렬·응답 직렬화에서 타임존이 흔들리지 않는다. MongoDB는 밀리초까지만 저장하므로, 자르지 않으면 저장 직후 응답(마이크로초)과 이후 조회 응답(밀리초)이 달라진다.
+- **검토한 대안**: 응답 schema에서 자르기 — 응답마다 처리해야 하고, 도메인 값(cursor 위치 등)은 여전히 저장 값과 다르다.
 
 ## 이름 중복을 service에 전달하는 방법
 - **결정**: repository가 `DuplicateKeyError`를 잡아 `keyPattern`이 이름 인덱스(`uniq_owner_name`)일 때만 `DuplicateJobNameError`로 바꾸고, service가 `JOB_NAME_DUPLICATED`로 바꾼다. 다른 유니크 위반은 그대로 올려 500.

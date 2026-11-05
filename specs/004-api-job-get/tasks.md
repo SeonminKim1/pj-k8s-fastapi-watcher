@@ -12,12 +12,17 @@
   - 라우터: `response_model=JobResponse`, `description`에 `specs/004-api-job-get/contracts/get-job.md` 경로, `responses`에 200 example `JOB_RESPONSE_EXAMPLE`·`NOT_FOUND_RESPONSES`
   - 테스트: 200 본문·`get_job(owner_id, job_id)` 전달, `running` 상태 job의 상태·`updated_at`이 그대로 나옴(US1/AC2), `JOB_NOT_FOUND` 404 본문, 헤더 없음·형식 오류 400 `invalid_user_id`(service 미호출), OpenAPI 200·400·404·500, 404 example, `POST /jobs`·`GET /jobs`에 404 없음, 200 example이 `JobResponse`로 검증
 
-## Phase 2: 마무리 (Polish)
-- [ ] T002 README API 표에 `GET /jobs/{job_id}`·에러 상세 링크, quickstart 시나리오 1~4 직접 확인, 완료 체크리스트 — `README.md` — 선행: T001
+## Phase 2: 유저 스토리 1 - 생성 응답과 같은 시각 (P1)
+- **목표**: 생성 응답과 조회 응답의 시각이 같다(US1/AC1). quickstart 시나리오 1에서 생성 응답(마이크로초)과 조회 응답(MongoDB 밀리초)이 달랐다
+- [x] T003 [US1] 서버 시각 `_now()`(UTC, 밀리초로 자름)를 생성·상태 갱신·삭제에 적용 + service 테스트(세 시각이 밀리초 단위) — `src/services/user_job_service.py`, `tests/test_user_job_service.py` — 선행: T001
+
+## Phase 3: 마무리 (Polish)
+- [ ] T002 README API 표에 `GET /jobs/{job_id}`·에러 상세 링크, quickstart 시나리오 1~4 직접 확인, 완료 체크리스트 — `README.md` — 선행: T003
 
 ## 실행 흐름 (Dependencies & Execution Order)
 1. (순차) T001
-2. (순차) T002
+2. (순차) T003
+3. (순차) T002
 
 ## 구현 전략
 - **MVP**: Phase 1(US1·US2)이 끝나면 독립 확인 가능. US1과 US2는 같은 엔드포인트의 정상·에러 응답이라 한 작업으로 묶었다

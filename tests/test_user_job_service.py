@@ -562,3 +562,20 @@ async def test_delete_job_not_found(service: UserJobService, case: str) -> None:
     with pytest.raises(MyApiError) as e:
         await service.delete_job(owner, job_id)
     assert_error(e, ErrorEnum.JOB_NOT_FOUND)
+
+
+# 서버가 만드는 시각(생성·상태 갱신·삭제)은 밀리초 단위다. MongoDB 저장 정밀도와 같아 생성 응답과 조회 응답이 같다.
+def assert_millis(value: datetime | None) -> None:
+    assert value is not None and value.microsecond % 1000 == 0
+
+
+async def test_times_are_milliseconds(
+    service: UserJobService, repo: FakeUserJobRepository
+) -> None:
+    job = await service.create_job(owner_id="alice", name="my-app", template=web())
+    assert_millis(job.created_at)
+    assert_millis(job.updated_at)
+    updated = await service.update_job_status(job.id, JobStatus.RUNNING)
+    assert_millis(updated.updated_at)
+    await service.delete_job("alice", job.id)
+    assert_millis(repo.docs[job.id]["deleted_at"])
