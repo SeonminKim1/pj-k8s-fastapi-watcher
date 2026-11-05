@@ -22,7 +22,6 @@
   - `uniq_owner_name`: `{owner_id: 1, name: 1}` 유니크, `partialFilterExpression: {is_deleted: false}`. 삭제되지 않은 job끼리만 이름 중복을 막는다. 삭제된 job의 이름은 다시 쓸 수 있다.
   - `uniq_owner_slot`: `{owner_id: 1, quota_slot: 1}` 유니크, `partialFilterExpression: {is_deleted: false}`. 개수 한도를 동시 요청에서도 지킨다.
   - `owner_created_at`: `{owner_id: 1, created_at: -1}`. 유저별 목록 조회용(정렬·cursor 구성은 `specs/003-api-job-list/research.md`).
-- **기존 데이터**: `template` 필드가 없는 문서는 마이그레이션하지 않는다(운영 데이터 없음). 개발 DB에 남아 있으면 지운다.
 
 ### JobTemplate
 `type`으로 구분하는 템플릿 입력(`Annotated[WebTemplate, Field(discriminator="type")]`). 지금은 `WebTemplate` 하나다.
@@ -53,7 +52,7 @@
 - **허용 리소스 (apiVersion, kind)**: 템플릿 타입마다 자기가 만드는 kind 목록을 가진다(`src/services/job_templates.py`의 `KINDS_BY_TYPE`). 전체 허용 목록은 그 합이다.
   - `web`: `apps/v1 Deployment`, `v1 Service`
   - `v1 Secret`은 매니페스트(`data`)가 MongoDB에 평문으로 남기 때문에 제외한다.
-  - `v1 ConfigMap`, `batch/v1 Job`은 매니페스트 직접 입력을 없애면서 뺐다. 이를 쓰는 템플릿을 추가할 때 다시 넣는다.
+  - 그 밖의 kind(`v1 ConfigMap`, `batch/v1 Job` 등)는 그것을 만드는 템플릿을 추가할 때 넣는다.
 
 ## 템플릿 → 매니페스트 (`web`, `src/services/job_templates.py`)
 크기 프리셋(requests = limits, `SIZE_PRESETS`): `small` = cpu `100m` / memory `128Mi`, `medium` = cpu `250m` / memory `256Mi`
@@ -133,7 +132,6 @@
 | MongoDB 오류 | (전역 핸들러) `db_error` | 500 |
 
 - 템플릿 필드 오류는 `WebTemplate` 모델 검증에서 걸린다. API에서는 필드별 400 에러(`invalid_job_type`, `invalid_image`, `invalid_port`, `invalid_replicas`, `invalid_env`, `invalid_size`)로 바뀐다(`specs/002-api-job-create/contracts/post-jobs.md`).
-- 매니페스트 직접 입력이 없어지면서 `INVALID_JOB_RESOURCE`(`invalid_job_resource`)는 쓰지 않는다.
 
 ## 의존 리소스
 - MongoDB `user_jobs` 컬렉션 (`src/core/db/mongodb.py`)
@@ -141,4 +139,4 @@
 
 ## 다른 기능에 넘기는 규칙
 - **operator — 이름 재사용과 정리 순서**: job을 지운 직후 같은 이름으로 다시 만들면 옛 리소스가 아직 클러스터에 남아 있을 수 있다. operator는 apply 전에 같은 이름의 리소스가 다른 `user-job-id` 라벨을 갖고 있으면 apply하지 않고 다음 resync까지 미룬다(옛 job 정리를 기다림). API는 이를 위해 바뀌지 않는다. 상세는 `component-job-operator`에서 정한다.
-- **operator — selector**: selector가 `app.kubernetes.io/name`뿐이라 지운 job과 같은 이름의 새 job이 서로의 Pod를 고를 수 있다. 위 규칙으로 두 job의 리소스가 동시에 존재하지 않게 막는다(`specs/002-api-job-create/implement.md` 리뷰 5).
+- **operator — selector**: selector가 `app.kubernetes.io/name`뿐이라 지운 job과 같은 이름의 새 job이 서로의 Pod를 고를 수 있다. 위 규칙으로 두 job의 리소스가 동시에 존재하지 않게 막는다.

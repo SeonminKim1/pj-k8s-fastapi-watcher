@@ -1,8 +1,8 @@
 # 기능 명세: job 생성 API
 
-- **브랜치**: (이관 전 `feature/api-job-create`)
-- **작성일**: 2026-10-28 (2026-11-06 `docs/api-job-create/`에서 이관, 옛 PRD·SPEC은 git 이력)
-- **상태**: 확정 (구현 완료)
+- **브랜치**: `002-api-job-create`
+- **작성일**: 2026-10-28
+- **상태**: 확정
 - **입력**: "유저가 템플릿 입력으로 job을 생성하는 API"
 
 ## 개요 (Overview)
@@ -16,7 +16,7 @@
   - 클러스터 리소스·네임스페이스 생성 → 이후 `component-job-operator`
   - 같은 요청을 여러 번 보낼 때의 멱등성 키(이름 중복 규칙으로 두 번째 요청은 400이 된다)
 - **관련 요구사항**: `CLAUDE.md`의 "유저 식별", "유저별 네임스페이스", "유저별 job 개수 제한", "job 입력은 템플릿 방식", "에러 상태 코드", "operator 패턴"
-  - `specs/001-domain-user-job/`: `create_job`을 매니페스트 목록 입력에서 템플릿 입력으로 바꾸고, job 문서에 유저 입력(`template`)과 한도 슬롯(`quota_slot`)을 저장하도록 이 기능에서 함께 고쳤다.
+  - `specs/001-domain-user-job/`: 이 기능에서 도메인의 `create_job`이 템플릿을 입력받고, job 문서에 유저 입력(`template`)과 한도 슬롯(`quota_slot`)을 저장하게 한다.
 
 ## 유저 시나리오와 테스트 (User Scenarios & Testing) *(필수)*
 
@@ -74,7 +74,7 @@
 - **FR-009**: API 문서에는 실제로 돌려주는 응답(201, 400, 500)만 보이고, 요청·응답 예가 실제 값으로 보여야 한다.
 
 ### 핵심 엔티티 (Key Entities)
-- **UserJob**: `specs/001-domain-user-job/`의 job. 이 기능에서 유저 입력(템플릿)과 한도 슬롯이 더해졌다.
+- **UserJob**: `specs/001-domain-user-job/`의 job. 유저 입력(템플릿)과 한도 슬롯을 가진다.
 - **JobTemplate (`web`)**: 이미지, 포트, 레플리카 수, 환경 변수, 크기 프리셋.
 
 ## 성공 기준 (Success Criteria) *(필수)*
