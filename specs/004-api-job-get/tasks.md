@@ -21,7 +21,7 @@
 
 ## Phase 4: 수렴 (Convergence)
 - [x] T004 `/docs`에 보이는 400 설명 문구 "(목록은 엔드포인트 설명의 spec 참고)"를 contracts 기준으로 고친다 — `src/schemas/error_response.py` — 출처: plan: `COMMON_ERROR_RESPONSES` code 목록 기준 (partial)
-- [ ] T005 `CLAUDE.md` 고유 모듈의 `error_response.py` 설명에 404 문서(`NOT_FOUND_RESPONSES`)를 더한다 — `CLAUDE.md` — 출처: Constitution I (partial)
+- [x] T005 `CLAUDE.md` 고유 모듈의 `error_response.py` 설명에 404 문서(`NOT_FOUND_RESPONSES`)를 더한다 — `CLAUDE.md` — 출처: Constitution I (partial)
 - **실행 순서**: 1. (순차) T004 2. (순차) T005
 
 ## 실행 흐름 (Dependencies & Execution Order)

@@ -11,7 +11,7 @@
 - `src/core/dependencies.py`: `main.py` lifespan에서 클러스터 설정 로딩(`get_k8s_service()`)과 repository `ensure_indexes()`를 한다. 그래서 앱을 띄우려면 클러스터 설정(in-cluster 또는 kubeconfig)과 MongoDB가 모두 필요하다.
 - `src/services/k8s_service.py`: `K8sService`. 클러스터 접근은 반드시 이 클래스를 거친다.
 - `src/core/exception/validation_error.py`: 요청 검증 에러(FastAPI 422)를 필드별 `ErrorEnum` 하나로 바꿔 400으로 응답한다(`to_error_enum()`, OpenAPI에서도 422 제거). 새 입력 필드에는 타입에 `error_code(ErrorEnum.XXX)`를 붙이고, 필수 필드라 누락도 그 code로 알려야 하면 `_MISSING_ERRORS`에도 추가한다.
-- `src/main.py`: `PyMongoError` → 500 `db_error`. 500 본문 상수와 공통 400·500 응답 문서(`COMMON_ERROR_RESPONSES`)는 `schemas/error_response.py`.
+- `src/main.py`: `PyMongoError` → 500 `db_error`. 500 본문 상수, 라우터 공통 400·500 응답 문서(`COMMON_ERROR_RESPONSES`), 404를 돌려주는 엔드포인트에만 붙이는 응답 문서(`NOT_FOUND_RESPONSES`)는 `schemas/error_response.py`.
 - `src/models/k8s_names.py`: 유저 ID·DNS-1035 이름·이미지 참조·env 이름 형식 규칙의 유일한 정의(`Annotated` 타입과 `is_*` 함수).
 - `src/models/enums.py`: 도메인 enum(`JobStatus`, `JobType`, `JobSize`). 새 enum도 여기에 둔다(`ErrorEnum`만 `core/exception/my_exception.py`).
 - `src/services/job_templates.py`: 템플릿 → 매니페스트 생성과 서버 고정 값(크기 프리셋, 보안 설정, 라벨 등). job 타입을 추가할 때는 `JobType`, `models/user_job_models.py`의 템플릿 모델, 이 파일의 생성 함수·`KINDS_BY_TYPE`을 함께 늘린다.

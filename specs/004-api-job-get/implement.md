@@ -15,6 +15,9 @@
 - converge: 남은 일 2건(LOW partial) → 수렴 phase T004·T005 추가
 - ▶ 수렴 phase (순차) T004 시작 — `/docs` 400 설명 문구를 contracts 기준으로
 - ✔ T004 완료 — `src/schemas/error_response.py`. OpenAPI 세 엔드포인트의 400 설명 확인, pytest 296 passed
+- ▶ 수렴 phase (순차) T005 시작 — `CLAUDE.md` 고유 모듈에 404 문서
+- ✔ T005 완료 — `CLAUDE.md`. pytest 296 passed
+- ■ 수렴 phase 완료 — 다음: `/sdd-speckit-converge`
 
 ## spec과 달라진 점
 - 없음
