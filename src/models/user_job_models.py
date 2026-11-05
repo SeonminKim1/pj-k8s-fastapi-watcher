@@ -11,7 +11,7 @@ from src.models.k8s_names import EnvName, ImageRef
 # 유저 한 명이 가질 수 있는 삭제되지 않은 job 수(CLAUDE.md "유저별 job 개수 제한").
 MAX_JOBS_PER_USER = 10
 
-# job 목록 한 페이지의 기본 개수와 상한(docs/api-job-list/spec.md). schema와 service가 함께 쓴다.
+# job 목록 한 페이지의 기본 개수와 상한(specs/003-api-job-list/contracts/get-jobs.md). schema와 service가 함께 쓴다.
 # 상한을 바꾸면 ErrorEnum.INVALID_LIMIT 메시지(enum 값이라 상수로 만들 수 없음)도 함께 고친다.
 JOB_LIST_DEFAULT_LIMIT = 20
 JOB_LIST_MAX_LIMIT = 100

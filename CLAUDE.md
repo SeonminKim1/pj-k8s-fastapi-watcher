@@ -15,7 +15,8 @@
 - `src/models/k8s_names.py`: 유저 ID·DNS-1035 이름·이미지 참조·env 이름 형식 규칙의 유일한 정의(`Annotated` 타입과 `is_*` 함수).
 - `src/models/enums.py`: 도메인 enum(`JobStatus`, `JobType`, `JobSize`). 새 enum도 여기에 둔다(`ErrorEnum`만 `core/exception/my_exception.py`).
 - `src/services/job_templates.py`: 템플릿 → 매니페스트 생성과 서버 고정 값(크기 프리셋, 보안 설정, 라벨 등). job 타입을 추가할 때는 `JobType`, `models/user_job_models.py`의 템플릿 모델, 이 파일의 생성 함수·`KINDS_BY_TYPE`을 함께 늘린다.
-- 이슈 트래커: GitHub Project (`/sdd-feat`가 `.claude/skills/sdd-feat/tracker-github.md`로 연동, 비어 있으면 연동 안 함)
+- SDD 방식: spec-kit 기반 `/sdd-speckit-*`(`.claude/skills/sdd-speckit/process.md`). 기능 문서는 `specs/NNN-<이름>/`
+- 이슈 트래커: GitHub Project (`/sdd-speckit-*`가 `.claude/skills/sdd-feat/tracker-github.md`의 명령으로 연동, 비어 있으면 연동 안 함)
   - owner: `SeonminKim1`
   - Project 번호: `3`, 제목: `pj-k8s-fastapi-watcher` (https://github.com/users/SeonminKim1/projects/3, 저장소 `SeonminKim1/pj-k8s-fastapi-watcher`)
 
@@ -24,7 +25,7 @@
 - **유저별 네임스페이스**: 유저의 리소스는 모두 전용 네임스페이스 `user-{유저 ID}`에 둔다. 다른 네임스페이스에는 만들지 않는다.
 - **유저별 job 개수 제한**: 유저 한 명이 가질 수 있는 삭제되지 않은 job은 10개까지다. 넘으면 400.
 - **에러 상태 코드**: 400(잘못된 요청·규칙 위반·중복·상태 충돌), 404(없음·남의 리소스), 500(서버 내부 오류)만 쓴다. 비즈니스 에러는 400·404 중 하나이고 구분은 `ErrorEnum`의 `code`로 한다.
-- **핵심 도메인 — user-job**: 유저가 만든 쿠버네티스 리소스 묶음(예: Deployment + Service)을 하나의 job으로 관리한다. job은 MongoDB에 소유자·구성 리소스(매니페스트 원본 포함)·상태를 기록한다. 상세: `docs/domain-user-job/`
+- **핵심 도메인 — user-job**: 유저가 만든 쿠버네티스 리소스 묶음(예: Deployment + Service)을 하나의 job으로 관리한다. job은 MongoDB에 소유자·구성 리소스(매니페스트 원본 포함)·상태를 기록한다. 상세: `specs/001-domain-user-job/`
 - **job 입력은 템플릿 방식**: 유저는 쿠버네티스 매니페스트를 직접 보내지 않는다. job 타입(지금은 `web`만)과 그 타입이 허용하는 필드만 보내고, 서버가 매니페스트를 생성한다. 라벨·네임스페이스·리소스 requests/limits(크기 프리셋)·보안 설정 등은 서버가 고정하며 유저가 바꿀 수 없다. 새 구성이 필요하면 타입이나 필드를 추가한다.
 - **operator 패턴**:
   - MongoDB의 job 문서가 원하는 상태(desired), 클러스터가 실제 상태(actual)다.

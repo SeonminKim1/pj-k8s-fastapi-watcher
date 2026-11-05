@@ -8,7 +8,7 @@ from src.core.exception.my_exception import ErrorEnum
 
 # FastAPI 요청 검증 에러(RequestValidationError)를 ErrorEnum 하나로 바꾼다.
 # 필드가 error_code()로 자기 에러를 직접 내므로, 여기서는 에러 종류(type)만 보고 우선순위로 하나를 고른다
-# (docs/api-job-create/spec.md, docs/api-job-list/spec.md "요청 검증 에러").
+# (specs/002-api-job-create/contracts/post-jobs.md, specs/003-api-job-list/contracts/get-jobs.md "요청 검증 에러").
 
 # 우선순위: 앞에 있을수록 먼저 알려준다.
 _PRIORITY: tuple[ErrorEnum, ...] = (
